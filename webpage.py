@@ -40,7 +40,8 @@ class WebpageBuilder:
             for email in self.mailtos[party]:
                 link = link + email
             link = link + '"> ' + party + \
-                '(' + str(len(self.mailtos[party].split(","))) + ') </a></h1>'
+                '(' + \
+                str(len(self.mailtos[party].split(","))-1) + ') </a></h1>'
 
             self.links.append(link)
 
