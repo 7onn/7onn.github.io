@@ -22,7 +22,7 @@ class WebpageBuilder:
         <script src='main.js'></script>
         </head>
         <body>
-        <h1>camara dos deputades</h1>
+        <h1>camara des deputades</h1>
         '''
         for link in self.links:
             self.html = self.html + link
