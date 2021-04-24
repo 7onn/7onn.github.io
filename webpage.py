@@ -22,6 +22,7 @@ class WebpageBuilder:
         <script src='main.js'></script>
         </head>
         <body>
+        <h1>camara dos deputades</h1>
         '''
         for link in self.links:
             self.html = self.html + link
@@ -36,12 +37,12 @@ class WebpageBuilder:
 
     def build_links(self):
         for party in self.mailtos:
-            link = '<h1><a href="mailto:'
+            link = '<h2><a href="mailto:'
             for email in self.mailtos[party]:
                 link = link + email
             link = link + '"> ' + party + \
                 '(' + \
-                str(len(self.mailtos[party].split(","))-1) + ') </a></h1>'
+                str(len(self.mailtos[party].split(","))-1) + ') </a></h2>'
 
             self.links.append(link)
 
