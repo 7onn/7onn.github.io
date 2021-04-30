@@ -10,30 +10,17 @@ class WebpageBuilder:
 
     def build_html(self):
         self.html = """
-        <html>
-
-        <head>
-        <meta charset='utf-8'>
-        <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-        <title>vacilao vai ser cobrado</title>
-        <meta name='viewport' content='width=device-width, initial-scale=1'>
-        <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
-        <script src='main.js'></script>
-        </head>
-        <body>
-        <h1>camara des deputades</h1>
-        """
+---
+title: "Envie seu email para deputades"
+date: 2021-04-29T21:01:00-03:00
+draft: false
+---
+<h1>Escolha o partido destinatario</h1>
+"""
         for link in self.links:
             self.html = self.html + link
 
-        self.html = (
-            self.html
-            + """
-        </body>
-        </html>
-        """
-        )
-        f = open("./index.html", "w")
+        f = open("./content/post/congresso.md", "w")
         f.write(self.html)
         f.close()
 

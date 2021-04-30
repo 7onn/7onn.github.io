@@ -1,0 +1,55 @@
+name: update_contacts
+on:
+  push:
+    branches: 
+      - "main"
+  schedule:
+  - cron: 0 7 * * *  # Every day at 7 am
+
+jobs:
+  run:
+    name: daily job - update_contacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        
+      - name: set up python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+
+      - name: install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt
+      
+      - name: lint with black
+        run: |
+          black .
+
+      - name: update politicians contacts
+        run: |
+          python3 .
+
+      - name: commit changes
+        uses: EndBug/add-and-commit@v7
+        with:
+          author_name: bot
+          author_email: thom.blizz@gmail.com
+          message: 'updating contact lists'
+          add: '*'
+
+      - name: setup hugo
+        uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: 'latest'
+
+      - name: build
+        run: hugo --minify
+
+      - name: deploy gh pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.TOKEN }}
+          publish_dir: ./public

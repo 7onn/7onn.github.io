@@ -1,0 +1,41 @@
+baseUrl: https://tompsh.github.io
+languageCode: en-us
+title: tompsh
+theme: hugo-tania
+enableEmoji: true
+privacy:
+  disqus:
+    disable: true
+  googleAnalytics:
+    disable: true
+  instagram:
+    disable: true
+  twitter:
+    disable: true
+  vimeo:
+    disable: true
+  youtube:
+    disable: true
+menu:
+  header:
+  - name: blog
+    url: /
+    weight: 0
+  footer:
+  - name: RSS
+    url: /index.xml
+markup:
+  highlight:
+    noClasses: false
+    lineNos: true
+  goldmark:
+    renderer:
+      unsafe: true
+params:
+  titleEmoji: '🤓🔧'
+  mainSections:
+  - post
+  socialOptions:
+    github: https://github.com/tompsh
+    linkedin: https://www.linkedin.com/in/tompsh/
+    twitter: https://twitter.com/tompshh
