@@ -20,6 +20,14 @@ jobs:
       - name: build
         run: hugo --minify
 
+      - name: commit changes
+        uses: EndBug/add-and-commit@v7
+        with:
+          author_name: bot
+          author_email: thom.blizz@gmail.com
+          message: 'updating landing page'
+          add: '*'
+
       - name: deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
