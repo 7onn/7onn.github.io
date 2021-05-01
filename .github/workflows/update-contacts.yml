@@ -2,10 +2,6 @@ name: update contacts
 on:
   schedule:
   - cron: 0 7 * * *  # Every day at 7 am
-  push:
-    branches: 
-    - "main"
-
 jobs:
   run:
     name: daily job - update contacts
@@ -37,5 +33,5 @@ jobs:
         with:
           author_name: bot
           author_email: thom.blizz@gmail.com
-          message: 'updating contact lists'
+          message: 'Update politicians contact list'
           add: '*'
