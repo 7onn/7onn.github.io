@@ -1,7 +1,9 @@
 ---
-title: artigos
+title: atividades
 subtitle: registros pessoais
 date: 2021-04-29
 type: section
 layout: archives
+aliases:
+- /articles.html
 ---

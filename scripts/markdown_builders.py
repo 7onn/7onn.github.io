@@ -11,11 +11,13 @@ class CongressMarkdownBuilder:
     def build_html(self):
         self.html = """
 ---
-title: "Envie seu email para deputades"
+title: "Envie seu email aos representantes no congresso"
 date: 2021-04-29T21:01:00-03:00
+tags: [politics, congress, email]
+author: tom
 draft: false
 ---
-<h1>Escolha o partido destinatario</h1>
+<h1>Escolha o partido</h1>
 """
         for link in self.links:
             self.html = self.html + link

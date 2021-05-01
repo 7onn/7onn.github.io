@@ -1,6 +1,6 @@
 baseUrl: https://tompsh.github.io
 languageCode: en-us
-title: tompsh
+title: tom
 theme: hugo-tania
 enableEmoji: true
 privacy:
@@ -20,7 +20,8 @@ menu:
   header:
   - name: blog
     url: /
-    weight: 0
+  - name: about
+    url: /about/
   footer:
   - name: RSS
     url: /index.xml

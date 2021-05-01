@@ -1,7 +1,9 @@
 
 ---
-title: "Envie seu email para deputades"
+title: "Envie seu email aos representantes no congresso"
 date: 2021-04-29T21:01:00-03:00
+author: tom
+tags: [politics, congress, email]
 draft: false
 ---
 <h1>Escolha o partido</h1>
