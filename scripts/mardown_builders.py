@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-class WebpageBuilder:
+class CongressMarkdownBuilder:
     def __init__(self):
         self.html = ""
         self.links = []
@@ -20,7 +20,7 @@ draft: false
         for link in self.links:
             self.html = self.html + link
 
-        f = open("./content/post/congresso.md", "w")
+        f = open("./content/post/congress.md", "w")
         f.write(self.html)
         f.close()
 
@@ -52,5 +52,4 @@ draft: false
 
         self.build_links()
         self.build_html()
-
         print(self.html)

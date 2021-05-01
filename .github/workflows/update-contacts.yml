@@ -1,11 +1,14 @@
-name: update_contacts
+name: update contacts
 on:
   schedule:
   - cron: 0 7 * * *  # Every day at 7 am
+  push:
+    branches: 
+    - "main"
 
 jobs:
   run:
-    name: daily job - update_contacts
+    name: daily job - update contacts
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -23,11 +26,11 @@ jobs:
       
       - name: lint with black
         run: |
-          black .
+          black ./scripts/
 
       - name: update politicians contacts
         run: |
-          python3 .
+          python3 ./scripts/
 
       - name: commit changes
         uses: EndBug/add-and-commit@v7
