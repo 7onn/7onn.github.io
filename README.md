@@ -5,7 +5,7 @@ currently, this repository holds a wannabe communication portal for people to re
 ## run it locally
 ```bash
 pip3 install -r requirements.txt
-python3 .
+python3 ./scripts/
 ```
 
 ## deployment
