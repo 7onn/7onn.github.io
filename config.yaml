@@ -18,9 +18,9 @@ privacy:
     disable: true
 menu:
   header:
-  - name: blog
+  - name: Blog
     url: /
-  - name: about
+  - name: About
     url: /about/
   footer:
   - name: RSS
