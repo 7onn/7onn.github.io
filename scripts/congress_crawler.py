@@ -16,7 +16,7 @@ def get_html(url):
 class CongressCrawler:
     def __init__(self):
         self.base_url = "https://www.camara.leg.br/"
-        self.congresspeople = []
+        self.congress = []
         self.search_url = (
             self.base_url + "deputados/quem-sao/resultado?search=&partido=&uf=&sexo="
         )
@@ -44,18 +44,18 @@ class CongressCrawler:
         for link in soup.find_all(href=re.compile(r"/deputados/\d.*")):
             yield urljoin(self.base_url, link.get("href"))
 
-    def get_congresspeople_by_page(self, url):
+    def get_congress_by_page(self, url):
         logging.info(f"page: {url}")
         soup = BeautifulSoup(get_html(url), "html.parser")
         for congressperson_url in self.get_congressperson_href(soup):
             congressperson = self.get_congressperson_data(congressperson_url)
             if congressperson:
-                self.congresspeople.append(congressperson)
+                self.congress.append(congressperson)
                 logging.info(
                     f'congressperson: {congressperson_url} - email: {congressperson["email"]} - party: {congressperson["party"]}'
                 )
 
-    def get_total_congresspeople(self, legislature):
+    def get_total_congress(self, legislature):
         soup = BeautifulSoup(
             get_html(self.search_url + "&legislatura=" + legislature),
             "html.parser",
@@ -74,10 +74,10 @@ class CongressCrawler:
     def run(self):
         try:
             legislature = self.get_current_legislature()
-            total = self.get_total_congresspeople(legislature)
+            total = self.get_total_congress(legislature)
             pages = round(int(total) / 25) + 1
             for i in range(1, pages):
-                self.get_congresspeople_by_page(
+                self.get_congress_by_page(
                     self.search_url
                     + "&legislatura="
                     + legislature
@@ -87,6 +87,6 @@ class CongressCrawler:
         except Exception:
             logging.exception("global failure")
         finally:
-            df = pd.DataFrame(self.congresspeople)
-            df.to_csv("congresspeople.csv")
+            df = pd.DataFrame(self.congress)
+            df.to_csv("congress.csv")
             logging.info("program exited")

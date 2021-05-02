@@ -6,7 +6,7 @@ class CongressMarkdownBuilder:
         self.html = ""
         self.links = []
         self.mailtos = {}
-        self.df_congresspeople = pd.read_csv("congresspeople.csv").sort_values("party")
+        self.df_congress = pd.read_csv("congress.csv").sort_values("party")
 
     def build_html(self):
         self.html = """
@@ -45,7 +45,7 @@ draft: false
     def run(self):
         emails = ""
         party = ""
-        for _, row in self.df_congresspeople.iterrows():
+        for _, row in self.df_congress.iterrows():
             emails = emails + row["email"] + ","
             if row["party"] != party:
                 self.mailtos[row["party"]] = emails
