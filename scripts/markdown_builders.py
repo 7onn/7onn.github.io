@@ -11,13 +11,14 @@ class CongressMarkdownBuilder:
     def build_html(self):
         self.html = """
 ---
-title: "Envie seu email aos representantes no congresso"
+title: "Solta o verbo! Edicao: congresso"
 date: 2021-04-29T21:01:00-03:00
 tags: [politics, congress, email]
 author: tom
 draft: false
 ---
 <h1>Escolha o partido</h1>
+<img src="/images/bolsonegligencia.jpeg" />
 """
         for link in self.links:
             self.html = self.html + link
@@ -67,13 +68,14 @@ class SenateMarkdownBuilder:
     def build_html(self):
         self.html = """
 ---
-title: "Envie seu email aos representantes no senado"
+title: "Solta o verbo! Edicao: senado"
 date: 2021-05-02T22:19:00-03:00
 tags: [politics, senate, email]
 author: tom
 draft: false
 ---
 <h1>Escolha o partido</h1>
+<img src="/images/protest01.jpg" />
 """
         for link in self.links:
             self.html = self.html + link

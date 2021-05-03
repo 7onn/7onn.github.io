@@ -1,6 +1,6 @@
 baseUrl: https://tompsh.github.io
 languageCode: en-us
-title: tom
+title: "📜🧙‍♂️ tom's blog"
 theme: hugo-tania
 enableEmoji: true
 privacy:
@@ -33,7 +33,7 @@ markup:
     renderer:
       unsafe: true
 params:
-  titleEmoji: '🤓🔧'
+  #titleEmoji: '📜'
   mainSections:
   - post
   socialOptions:

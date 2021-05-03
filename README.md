@@ -18,4 +18,4 @@ this project currently bears two responsabilities
 - webpage
   - it uses [hugo](https://gohugo.io/) to build my blog static files and [github actions](https://github.com/tompsh/tompsh.github.io/blob/main/.github/workflows/gh-pages.yml) to deploy it 
 - webcrawlers
-  - it relies on [github actions](https://github.com/tompsh/tompsh.github.io/blob/main/.github/workflows/update-contacts.yml) to perform daily web data crawlings at https://www.camara.leg.br/ and https://www25.senado.leg.br/
+  - it relies on [github actions](https://github.com/tompsh/tompsh.github.io/blob/main/.github/workflows/update-contacts.yml) to perform daily web data crawlings at [congress](https://www.camara.leg.br/), [senate](https://www25.senado.leg.br/) and [federal court of justice]()
