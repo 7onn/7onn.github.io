@@ -55,3 +55,60 @@ draft: false
         self.build_links()
         self.build_html()
         print(self.html)
+
+
+class SenateMarkdownBuilder:
+    def __init__(self):
+        self.html = ""
+        self.links = []
+        self.mailtos = {}
+        self.df_senate = pd.read_csv("senate.csv").sort_values("party")
+
+    def build_html(self):
+        self.html = """
+---
+title: "Envie seu email aos representantes no senado"
+date: 2021-05-02T22:19:00-03:00
+tags: [politics, senate, email]
+author: tom
+draft: false
+---
+<h1>Escolha o partido</h1>
+"""
+        for link in self.links:
+            self.html = self.html + link
+
+        f = open("./content/post/senate.md", "w")
+        f.write(self.html)
+        f.close()
+
+    def build_links(self):
+        for party in self.mailtos:
+            link = '<h2><a href="mailto:'
+            for email in self.mailtos[party]:
+                link = link + email
+            link = (
+                link
+                + '"> '
+                + party
+                + "("
+                + str(len(self.mailtos[party].split(",")) - 1)
+                + ") </a></h2>"
+            )
+
+            self.links.append(link)
+
+    def run(self):
+        emails = ""
+        party = ""
+        print(self.df_senate)
+        for _, row in self.df_senate.iterrows():
+            emails = emails + row["email"] + ","
+            if row["party"] != party:
+                self.mailtos[row["party"]] = emails
+                emails = ""
+            party = row["party"]
+
+        self.build_links()
+        self.build_html()
+        print(self.html)
