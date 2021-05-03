@@ -1,6 +1,6 @@
 # tompsh.github.io
 
-currently, this repository holds a wannabe communication portal for people to reach politicians right in their email inbox
+personal blog and ~~for a while~~ something more
 
 ## run it locally
 ```bash
@@ -8,5 +8,14 @@ pip3 install -r requirements.txt
 python3 ./scripts/
 ```
 
+```bash
+# https://gohugo.io/getting-started/installing/#debian-and-ubuntu
+hugo serve
+```
+
 ## deployment
-this repository uses [github actions](https://github.com/features/actions) to perform daily web data crawlings at https://www.camara.leg.br/
+this project currently bears two responsabilities
+- webpage
+  - it uses [hugo](https://gohugo.io/) to build my blog static files and [github actions](https://github.com/tompsh/tompsh.github.io/blob/main/.github/workflows/gh-pages.yml) to deploy it 
+- webcrawlers
+  - it relies on [github actions](https://github.com/tompsh/tompsh.github.io/blob/main/.github/workflows/update-contacts.yml) to perform daily web data crawlings at https://www.camara.leg.br/ and https://www25.senado.leg.br/
