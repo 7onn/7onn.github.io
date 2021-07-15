@@ -1,7 +1,7 @@
 name: update contacts
 on:
   schedule:
-  - cron: 0 7 * * *  # Every day at 7 am
+  - cron: 0 7 * * 1  # Every monday at 7 am
 jobs:
   run:
     name: daily job - update contacts
