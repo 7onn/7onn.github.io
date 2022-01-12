@@ -1,1 +1,1 @@
-Tentando fazer algo de util, mas nem sempre
+Software Engineer improving large-scaled solutions reliability.

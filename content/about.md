@@ -1,5 +1,5 @@
 ---
-title: Sobre
+title: About
 author: tom
 date: 2021-04-30
 tags: [bio, 7onn, pgp, key, email]
@@ -7,7 +7,7 @@ aliases:
 - /about.html
 ---
 
-Not much to say for now.
+I'm a self-taught developer who went to tell one computer what to do (suddenly there were dozens of it… and lately there have been hundreds) and is currently working to improve reliability in large-scaled distributed systems through automation alongside the pillars of observability (logs, metrics, traces).
 
 Here are a few of my open-source [contributions](https://github.com/search?q=is%3Apr+author%3A7onn+archived%3Afalse+is%3Aclosed+is%3Apublic+is%3Amerged).
 
