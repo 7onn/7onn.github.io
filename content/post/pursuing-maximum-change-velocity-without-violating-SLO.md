@@ -1,7 +1,7 @@
 ---
 title: "Pursuing maximum change velocity without violating SLO"
 date: 2022-02-05T10:00:00-03:00
-tags: [sre, sre-tenets, change, velocity, slo]
+tags: [sre, sre-tenets, change, velocity, slo, engineering]
 author: Tom M G
 draft: false
 ---
