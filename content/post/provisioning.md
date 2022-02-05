@@ -1,6 +1,6 @@
 ---
 title: "Provisioning"
-date: 2022-02-02T09:00:00-03:00
+date: 2022-02-02T10:00:00-03:00
 tags: [engineering, provision, sre, sre-tenets]
 author: Tom M G
 draft: false
