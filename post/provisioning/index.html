@@ -4,7 +4,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1">
 <meta http-equiv=x-ua-compatible content="IE=edge">
 <meta name=theme-color content="dark">
-<title> Demand forecasting and capacity planning | 📜🧙‍♂️ tom's blog</title>
+<title> Provisioning | 📜🧙‍♂️ tom's blog</title>
 <link rel=stylesheet href=/sass/main.min.4e90cee935c47394b47f9cb7ffe8e3ffab18b88d82fea203918cc3f92eec5eb2.css>
 </head>
 <body class=dark>
@@ -30,7 +30,7 @@
 <header class=article-header>
 <div class=thumb>
 <div>
-<h1>Demand forecasting and capacity planning</h1>
+<h1>Provisioning</h1>
 <div class=post-meta>
 <div>
 By Tom M G on <time>February 02, 2022</time>
@@ -50,21 +50,19 @@ By Tom M G on <time>February 02, 2022</time>
 <blockquote>
 <p>This following content is a transcript from <a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering</a> with some, maybe none, personal adjustments.</p>
 </blockquote>
-<p>Demand forecasting and capacity planning can be viewed as ensuring that there is sufficient capacity and redundancy to serve projected future demand with the required availability. There&rsquo;s nothing special about these concepts, except that a surprising number of services and teams don&rsquo;t take the steps necessary to ensure that the required capacity is in place by the time it is needed. Capacity planning should take both organic growth (which stems from natural product adoption and usage by customers) and inorganic growth (which results from events like feature launches, marketing campaigns, or other business-driven changes) into account.</p>
-<p>Several steps are mandatory on capacity planning:</p>
-<ul>
-<li>An accurate organic demand forecast, which extends beyond the lead time required for acquiring capacity</li>
-<li>An accurate incorporation of inorganic demand sources into the demand forecast</li>
-<li>Regular load testing of the system to correlate raw capacity (servers, disks, and so on) to service capacity</li>
-</ul>
-<p>Because capacity is critical to availability, it naturally follows that the SRE team must be responsible for capacity planning, which means they also must be in charge of provisioning.</p>
+<p>Provisioning combines both change management and capacity planning and it must occur quickly and only when necessary, as capacity is expensive.</p>
+<p>This exercise must also be done correctly or capacity doesn&rsquo;t work when needed. Adding new capacity often involves spinning up a new instance or location, making significant modification to existing systems (configuration files, load balancers, networking), and validating that the new capacity performs and delivers correct results. Thus, it is a riskier operation than load shifting, which is often done multiple times per hour, and must be treated with a corresponding degree of extra caution.</p>
 </div>
 </div>
 <div class=container>
 <nav class="flex container suggested">
-<a rel=prev href=/post/provisioning/ title="Previous post (older)">
+<a rel=prev href=/post/change-management/ title="Previous post (older)">
 <span>Previous</span>
-Provisioning
+Change management
+</a>
+<a rel=next href=/post/demand-forecasting-and-capacity-planning/ title="Next post (newer)">
+<span>Next</span>
+Demand forecasting and capacity planning
 </a>
 </nav>
 </div>

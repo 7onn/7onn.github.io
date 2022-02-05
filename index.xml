@@ -9,7 +9,12 @@
 &lt;li>An accurate incorporation of inorganic demand sources into the demand forecast&lt;/li>
 &lt;li>Regular load testing of the system to correlate raw capacity (servers, disks, and so on) to service capacity&lt;/li>
 &lt;/ul>
-&lt;p>Because capacity is critical to availability, it naturally follows that the SRE team must be responsible for capacity planning, which means they also must be in charge of provisioning.&lt;/p></description></item><item><title>Change management</title><link>https://blog.7onn.dev/post/change-management/</link><pubDate>Fri, 28 Jan 2022 09:00:00 -0300</pubDate><author>Tom M G</author><guid>https://blog.7onn.dev/post/change-management/</guid><description>
+&lt;p>Because capacity is critical to availability, it naturally follows that the SRE team must be responsible for capacity planning, which means they also must be in charge of provisioning.&lt;/p></description></item><item><title>Provisioning</title><link>https://blog.7onn.dev/post/provisioning/</link><pubDate>Wed, 02 Feb 2022 09:00:00 -0300</pubDate><author>Tom M G</author><guid>https://blog.7onn.dev/post/provisioning/</guid><description>
+&lt;blockquote>
+&lt;p>This following content is a transcript from &lt;a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering&lt;/a> with some, maybe none, personal adjustments.&lt;/p>
+&lt;/blockquote>
+&lt;p>Provisioning combines both change management and capacity planning and it must occur quickly and only when necessary, as capacity is expensive.&lt;/p>
+&lt;p>This exercise must also be done correctly or capacity doesn&amp;rsquo;t work when needed. Adding new capacity often involves spinning up a new instance or location, making significant modification to existing systems (configuration files, load balancers, networking), and validating that the new capacity performs and delivers correct results. Thus, it is a riskier operation than load shifting, which is often done multiple times per hour, and must be treated with a corresponding degree of extra caution.&lt;/p></description></item><item><title>Change management</title><link>https://blog.7onn.dev/post/change-management/</link><pubDate>Fri, 28 Jan 2022 09:00:00 -0300</pubDate><author>Tom M G</author><guid>https://blog.7onn.dev/post/change-management/</guid><description>
 &lt;blockquote>
 &lt;p>This following content is a transcript from &lt;a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering&lt;/a> with some, maybe none, personal adjustments.&lt;/p>
 &lt;/blockquote>
