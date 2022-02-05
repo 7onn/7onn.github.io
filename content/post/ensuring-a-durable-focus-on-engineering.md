@@ -1,6 +1,6 @@
 ---
 title: "Ensuring a durable focus on engineering"
-date: 2022-02-05T12:00:00-03:00
+date: 2022-02-05T09:00:00-03:00
 tags: [sre, sre-tenets, focus, engineering]
 author: Tom M G
 draft: false
