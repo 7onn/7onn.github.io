@@ -1,0 +1,87 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=theme-color content="dark">
+<title> Pursuing maximum change velocity without violating SLO | 📜🧙‍♂️ tom's blog</title>
+<link rel=stylesheet href=/sass/main.min.4e90cee935c47394b47f9cb7ffe8e3ffab18b88d82fea203918cc3f92eec5eb2.css>
+</head>
+<body class=dark>
+<nav class=navbar>
+<div class=container>
+<div class=flex>
+<div>
+<a class=brand href=/>
+📜🧙‍♂️ tom's blog
+</a>
+</div>
+<div class=flex>
+<a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button>
+</div>
+</div>
+</div>
+</nav>
+<main>
+<div class=container>
+<article>
+<header class=article-header>
+<div class=thumb>
+<div>
+<h1>Pursuing maximum change velocity without violating SLO</h1>
+<div class=post-meta>
+<div>
+By Tom M G on <time>February 05, 2022</time>
+</div>
+<div class=tags>
+<a href=/tags/sre/>sre</a>
+<a href=/tags/sre-tenets/>sre-tenets</a>
+<a href=/tags/change/>change</a>
+<a href=/tags/velocity/>velocity</a>
+<a href=/tags/slo/>slo</a>
+</div>
+</div>
+</div>
+</div>
+</header>
+</article>
+<div class=article-post>
+<blockquote>
+<p>This following content is a transcript from <a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering</a> with some, maybe none, personal adjustments.</p>
+</blockquote>
+<p>Product development and SRE teams can enjoy a productive working relationship by eliminating the structural conflict in their respective goals. The structural conflict is between the pace of innovation and product stability. This conflict often is expressed indirectly. In SRE we bring this conflict to the fore, and then resolve it with the introduction of an <code>error budget</code>.</p>
+<p>The error budget stems from the observation that 100% is the <em>wrong reliability target for almost everything</em>. In general, for any software service or system, 100% is not the right reliability target because no user can tell the difference between a system being 100% available and 99.999% available. There are many other systems in the path between user and service (their laptop, their WiFi, their Internet service provider, the power grid&mldr;) and those systems collectively are far less than 99.999% available. Thus, the marginal difference between 99.999% and 100% gets lost in the noise of other unavailability, and the user receives no benefit from the enormous effort required to add that last 0.001% of availability.</p>
+<p>If 100% us the wrong reliability target for a system, what, then, is the right reliability target for the system? This actually isn&rsquo;t a technical question at all - it&rsquo;s a product question, which should take the following considerations into account:</p>
+<ul>
+<li>What level of availability will the users be happy with, given how they use the product?</li>
+<li>What alternatives are available to users who are dissatisfied with the product&rsquo;s availability?</li>
+<li>What happens to users' product usage at different availability levels?</li>
+</ul>
+<p>The business or the product must establish the system&rsquo;s availability target. Once that target is set, the error budget is <code>100 - $AVAILABILITY_TARGET</code>. A service that&rsquo;s 99.99% available is 0.01% unavailable. That permitted 0.01% unavailability is the service&rsquo;s <em>error budget</em>. We might spend the budget on anything we want, as long as we don&rsquo;t overspend it.</p>
+<p>So how do we want to spend the error budget? The development team wants to launch features and attract new users. Ideally, we would spend all of our error budget taking risks to launch features quickly. This basic premise describes the whole model of error budgets. As soon as we conceptualize SRE activities in this framework, freeing up the error budget through tactics such as phased rollouts and 1% experiments can optimize for quicker launches.</p>
+<p>The use of an error budget resolves the structural conflict of incentives between development teams and SRE. SRE&rsquo;s goal is no longer &ldquo;zero outages&rdquo;; rather SREs and product developers aim to spend the error budget getting maximum feature velocity. This change makes all the difference. An outage is no longer a &ldquo;bad&rdquo; thing - it is an expected part of the process of innovation and an occurrence that both development and SRE teams manage rather than fear.</p>
+</div>
+</div>
+<div class=container>
+<nav class="flex container suggested">
+<a rel=prev href=/post/ensuring-a-durable-focus-on-engineering/ title="Previous post (older)">
+<span>Previous</span>
+Ensuring a durable focus on engineering
+</a>
+</nav>
+</div>
+</main>
+</main>
+<footer class="footer flex">
+<section class=container>
+<nav class=footer-links>
+<a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a>
+</nav>
+</section>
+<script async src=/js/features.min.c5d8f3350f5a652f526b982306299353824299adb7a3bd261ecffacc47087f66.js></script>
+</footer>
+</body>
+</html>

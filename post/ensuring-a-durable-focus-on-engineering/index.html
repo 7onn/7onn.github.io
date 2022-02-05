@@ -1,0 +1,79 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=theme-color content="dark">
+<title> Ensuring a durable focus on engineering | 📜🧙‍♂️ tom's blog</title>
+<link rel=stylesheet href=/sass/main.min.4e90cee935c47394b47f9cb7ffe8e3ffab18b88d82fea203918cc3f92eec5eb2.css>
+</head>
+<body class=dark>
+<nav class=navbar>
+<div class=container>
+<div class=flex>
+<div>
+<a class=brand href=/>
+📜🧙‍♂️ tom's blog
+</a>
+</div>
+<div class=flex>
+<a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button>
+</div>
+</div>
+</div>
+</nav>
+<main>
+<div class=container>
+<article>
+<header class=article-header>
+<div class=thumb>
+<div>
+<h1>Ensuring a durable focus on engineering</h1>
+<div class=post-meta>
+<div>
+By Tom M G on <time>February 05, 2022</time>
+</div>
+<div class=tags>
+<a href=/tags/sre/>sre</a>
+<a href=/tags/sre-tenets/>sre-tenets</a>
+<a href=/tags/focus/>focus</a>
+<a href=/tags/engineering/>engineering</a>
+</div>
+</div>
+</div>
+</div>
+</header>
+</article>
+<div class=article-post>
+<blockquote>
+<p>This following content is a transcript from <a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering</a> with some, maybe none, personal adjustments.</p>
+</blockquote>
+<p>SREs shouldn&rsquo;t dedicate more than 50% of their time in operational tasks.</p>
+<p>That being said, their remaining time should be spent using their coding skills on project work. In practice, this is accomplished by monitoring the amount of operational work being done, and redirecting excess operational work to the product development teams: reassigning bugs and tickets to development managers, [re]integrating developers into on-call pager rotations, and so on. The redirection ends when the operational load drops back to 50% or lower. This also provides an effective feedback mechanism, guiding developers to build systems that don&rsquo;t need manual intervention. This approach works well when the entire organization - SRE and development alike - understands why the safety valve mechanism exists and supports the goal of having no overflow events because the production doesn&rsquo;t generate enough operational load to require it.</p>
+<p>When they are focused on operations work, on average, SREs should receive a maximum of two events per 8-12-hour on-call shift. This target volume gives the on-call engineer enough time to handle the event accurately and quickly, clean up and restore normal service, and then conduct a postmortem. If more than two events occur regularly per on-call shift, problems can&rsquo;t be investigated thoroughly and engineers are sufficiently overwhelmed to prevent them from learning from these events. A scenario of pager fatigue also won&rsquo;t improve with scale. Conversely, if on-call SREs consistently receive fewer than one event per shift, keeping them on point is a waste of their time.</p>
+<p>Postmortems should be written for all significant incidents, regardless of whether or not they paged; postmortems that did not trigger a page are even more valuable, as they likely point to clear monitoring gaps. This investigation should establish what happened in detail, find all root causes of the event, and assign actions to correct the problem or improve how it is addressed next time. Ideally, we should operate under a <code>blame-free postmortem culture</code> to expose faults and apply engineering to fix these faults rather than avoiding or minimizing them.</p>
+</div>
+</div>
+<div class=container>
+<nav class="flex container suggested">
+<a rel=next href=/post/pursuing-maximum-change-velocity-without-violating-slo/ title="Next post (newer)">
+<span>Next</span>
+Pursuing maximum change velocity without violating SLO
+</a>
+</nav>
+</div>
+</main>
+</main>
+<footer class="footer flex">
+<section class=container>
+<nav class=footer-links>
+<a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a>
+</nav>
+</section>
+<script async src=/js/features.min.c5d8f3350f5a652f526b982306299353824299adb7a3bd261ecffacc47087f66.js></script>
+</footer>
+</body>
+</html>
