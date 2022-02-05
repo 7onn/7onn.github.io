@@ -1,0 +1,83 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=theme-color content="dark">
+<title> Monitoring | 📜🧙‍♂️ tom's blog</title>
+<link rel=stylesheet href=/sass/main.min.4e90cee935c47394b47f9cb7ffe8e3ffab18b88d82fea203918cc3f92eec5eb2.css>
+</head>
+<body class=dark>
+<nav class=navbar>
+<div class=container>
+<div class=flex>
+<div>
+<a class=brand href=/>
+📜🧙‍♂️ tom's blog
+</a>
+</div>
+<div class=flex>
+<a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button>
+</div>
+</div>
+</div>
+</nav>
+<main>
+<div class=container>
+<article>
+<header class=article-header>
+<div class=thumb>
+<div>
+<h1>Monitoring</h1>
+<div class=post-meta>
+<div>
+By Tom M G on <time>January 14, 2022</time>
+</div>
+<div class=tags>
+<a href=/tags/sre/>sre</a>
+<a href=/tags/sre-tenets/>sre-tenets</a>
+<a href=/tags/monitoring/>monitoring</a>
+<a href=/tags/engineering/>engineering</a>
+</div>
+</div>
+</div>
+</div>
+</header>
+</article>
+<div class=article-post>
+<blockquote>
+<p>This following content is a transcript from <a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering</a> with some, maybe none, personal adjustments.</p>
+</blockquote>
+<p>Monitoring is one of the primary means by which service owners keep track of a system&rsquo;s health and availability. As such, monitoring strategy should be constructed thoughtfully. A classic and common approach to monitoring is to watch for a specific value or condition, and then trigger an alert when that value is exceeded or that condition occurs. However, this type of alerting is not an effective solution: a system that requires a human to read a message and decide whether or not some type of action needs to be taken in response is fundamentally flawed. Monitoring should never require a human to interpret any part of the alerting domain. Instead, software should do the interpreting, and humans should be notified only when they need to take action.</p>
+<p>There are three kinds of valid monitoring output:</p>
+<h2 id=alerts>Alerts</h2>
+<p>Signify that a human needs to take action immediately in response to something that is either happening or about to happen, in order to improve the situation.</p>
+<h2 id=tickets>Tickets</h2>
+<p>Signify that a human needs to take action, but not immediately. The system can&rsquo;t automatically handle the situation, but if a human takes action in a few days, no damage will result.</p>
+<h2 id=logging>Logging</h2>
+<p>No one needs to look at this information, but it is recorded for diagnostic or forensic puporses. The expectation is that no one reads logs unless something else prompts them to do so.</p>
+</div>
+</div>
+<div class=container>
+<nav class="flex container suggested">
+<a rel=prev href=/post/pursuing-maximum-change-velocity-without-violating-slo/ title="Previous post (older)">
+<span>Previous</span>
+Pursuing maximum change velocity without violating SLO
+</a>
+</nav>
+</div>
+</main>
+</main>
+<footer class="footer flex">
+<section class=container>
+<nav class=footer-links>
+<a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a>
+</nav>
+</section>
+<script async src=/js/features.min.c5d8f3350f5a652f526b982306299353824299adb7a3bd261ecffacc47087f66.js></script>
+</footer>
+</body>
+</html>
