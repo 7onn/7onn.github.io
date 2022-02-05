@@ -1,1 +1,1 @@
-Software Engineer improving large-scaled solutions reliability.
+Software Engineer improving large-scaled systems' reliability.
