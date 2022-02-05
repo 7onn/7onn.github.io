@@ -4,7 +4,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1">
 <meta http-equiv=x-ua-compatible content="IE=edge">
 <meta name=theme-color content="dark">
-<title> Emergency response | 📜🧙‍♂️ tom's blog</title>
+<title> Change management | 📜🧙‍♂️ tom's blog</title>
 <link rel=stylesheet href=/sass/main.min.4e90cee935c47394b47f9cb7ffe8e3ffab18b88d82fea203918cc3f92eec5eb2.css>
 </head>
 <body class=dark>
@@ -30,15 +30,15 @@
 <header class=article-header>
 <div class=thumb>
 <div>
-<h1>Emergency response</h1>
+<h1>Change management</h1>
 <div class=post-meta>
 <div>
-By Tom M G on <time>January 21, 2022</time>
+By Tom M G on <time>January 28, 2022</time>
 </div>
 <div class=tags>
 <a href=/tags/engineering/>engineering</a>
 <a href=/tags/incidents/>incidents</a>
-<a href=/tags/on-call/>on-call</a>
+<a href=/tags/prevention/>prevention</a>
 <a href=/tags/sre/>sre</a>
 <a href=/tags/sre-tenets/>sre-tenets</a>
 </div>
@@ -51,19 +51,21 @@ By Tom M G on <time>January 21, 2022</time>
 <blockquote>
 <p>This following content is a transcript from <a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering</a> with some, maybe none, personal adjustments.</p>
 </blockquote>
-<p>Reliability is a function of mean time to failure (MTTF) and mean time to repair (MTTR). The most relevant metric in evaluating the effectiveness of emergency response is how quickly the response team can bring the system back to health - that is, the MTTR.</p>
-<p>Humans add latency. Even if a given system experiences more <em>actual</em> failures, a system that can avoid emergencies that require human intervention will have higher availability than a system that requires hands-on intervention. When humans are necessary, we have found that thinking through and recording the best practices ahead of time in a &ldquo;playbook&rdquo; produces roughly a 3x improvement in MTTR as compared to the strategy of &ldquo;winging it&rdquo;. The hero jack-of-all-trades on-call engineer does work, but the practiced on-call engineer armed with a playbook works <strong>much better</strong>.</p>
+<p>Probably, >70% of the outages are due to changes in a live system.</p>
+<p>Best practices in this domain are to use automation to accomplish the following:</p>
+<ul>
+<li>Implementing progressive rollouts</li>
+<li>Quickly and accurately detecting problems</li>
+<li>Rolling back changes safely when problems arise</li>
+</ul>
+<p>This trio of practices effectively minimizes the aggregate number of users and operations exposed to harmful changes. By removing humans from the loop, these practices avoid the common problems of fatigue, familiarity/contempt, and inattention to highly repetitive tasks. As a result, both release velocity and safety increase.</p>
 </div>
 </div>
 <div class=container>
 <nav class="flex container suggested">
-<a rel=prev href=/post/monitoring/ title="Previous post (older)">
+<a rel=prev href=/post/emergency-response/ title="Previous post (older)">
 <span>Previous</span>
-Monitoring
-</a>
-<a rel=next href=/post/change-management/ title="Next post (newer)">
-<span>Next</span>
-Change management
+Emergency response
 </a>
 </nav>
 </div>
