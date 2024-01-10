@@ -1,4 +1,349 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>📜🧙‍♂️ tom's blog</title><link>https://www.7onn.dev/</link><description>Recent content on 📜🧙‍♂️ tom's blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Fri, 22 Apr 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://www.7onn.dev/index.xml" rel="self" type="application/rss+xml"/><item><title>Efficiency and performance</title><link>https://www.7onn.dev/post/efficiency-and-performance/</link><pubDate>Sat, 05 Feb 2022 09:00:00 -0300</pubDate><author>Tom M G</author><guid>https://www.7onn.dev/post/efficiency-and-performance/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>📜🧙‍♂️ tom's blog</title><link>https://www.7onn.dev/</link><description>Recent content on 📜🧙‍♂️ tom's blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Tue, 09 Jan 2024 22:00:00 +0100</lastBuildDate><atom:link href="https://www.7onn.dev/index.xml" rel="self" type="application/rss+xml"/><item><title>GPG encryption and how to use it</title><link>https://www.7onn.dev/post/gpg-encryption/</link><pubDate>Tue, 09 Jan 2024 22:00:00 +0100</pubDate><author>Tom M G</author><guid>https://www.7onn.dev/post/gpg-encryption/</guid><description>
+&lt;h2 id="intro">Intro&lt;/h2>
+&lt;p>GPG, which stands for GNU Privacy Guard, is an open source implementation of the &lt;a href="https://en.wikipedia.org/wiki/Pretty_Good_Privacy">Pretty Good Privacy (PGP)&lt;/a> encryption standard. In this article, we&amp;rsquo;ll focus on asymmetric encryption, where we use a set of two keys, one public to encrypt, and one private that only itself can decrypt the encrypted content.&lt;/p>
+&lt;h2 id="creating-a-gpg-key">Creating a GPG key&lt;/h2>
+&lt;h3 id="generate-your-key-pair">Generate your key pair&lt;/h3>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;span class="lnt">49
+&lt;/span>&lt;span class="lnt">50
+&lt;/span>&lt;span class="lnt">51
+&lt;/span>&lt;span class="lnt">52
+&lt;/span>&lt;span class="lnt">53
+&lt;/span>&lt;span class="lnt">54
+&lt;/span>&lt;span class="lnt">55
+&lt;/span>&lt;span class="lnt">56
+&lt;/span>&lt;span class="lnt">57
+&lt;/span>&lt;span class="lnt">58
+&lt;/span>&lt;span class="lnt">59
+&lt;/span>&lt;span class="lnt">60
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ gpg --full-generate-key
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg &lt;span class="o">(&lt;/span>GnuPG&lt;span class="o">)&lt;/span> 2.4.3&lt;span class="p">;&lt;/span> Copyright &lt;span class="o">(&lt;/span>C&lt;span class="o">)&lt;/span> &lt;span class="m">2023&lt;/span> g10 Code GmbH
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">This is free software: you are free to change and redistribute it.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">There is NO WARRANTY, to the extent permitted by law.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Please &lt;span class="k">select&lt;/span> what kind of key you want:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>1&lt;span class="o">)&lt;/span> RSA and RSA
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>2&lt;span class="o">)&lt;/span> DSA and Elgamal
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>3&lt;span class="o">)&lt;/span> DSA &lt;span class="o">(&lt;/span>sign only&lt;span class="o">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>4&lt;span class="o">)&lt;/span> RSA &lt;span class="o">(&lt;/span>sign only&lt;span class="o">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>9&lt;span class="o">)&lt;/span> ECC &lt;span class="o">(&lt;/span>sign and encrypt&lt;span class="o">)&lt;/span> *default*
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>10&lt;span class="o">)&lt;/span> ECC &lt;span class="o">(&lt;/span>sign only&lt;span class="o">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">(&lt;/span>14&lt;span class="o">)&lt;/span> Existing key from card
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Your selection? &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">RSA keys may be between &lt;span class="m">1024&lt;/span> and &lt;span class="m">4096&lt;/span> bits long.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">What keysize &lt;span class="k">do&lt;/span> you want? &lt;span class="o">(&lt;/span>3072&lt;span class="o">)&lt;/span> &lt;span class="m">4096&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Requested keysize is &lt;span class="m">4096&lt;/span> bits
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Please specify how long the key should be valid.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nv">0&lt;/span> &lt;span class="o">=&lt;/span> key does not expire
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &amp;lt;n&amp;gt; &lt;span class="o">=&lt;/span> key expires in n days
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &amp;lt;n&amp;gt;w &lt;span class="o">=&lt;/span> key expires in n weeks
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &amp;lt;n&amp;gt;m &lt;span class="o">=&lt;/span> key expires in n months
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &amp;lt;n&amp;gt;y &lt;span class="o">=&lt;/span> key expires in n years
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Key is valid &lt;span class="k">for&lt;/span>? &lt;span class="o">(&lt;/span>0&lt;span class="o">)&lt;/span> &lt;span class="m">0&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Key does not expire at all
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Is this correct? &lt;span class="o">(&lt;/span>y/N&lt;span class="o">)&lt;/span> y
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">GnuPG needs to construct a user ID to identify your key.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Real name: John Doe
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Email address: john.doe@somewhere.com
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Comment: Personal encryption and signing GPG key
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">You selected this USER-ID:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="s2">&amp;#34;John Doe (Personal encryption and signing GPG key) &amp;lt;john.doe@somewhere.com&amp;gt;&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Change &lt;span class="o">(&lt;/span>N&lt;span class="o">)&lt;/span>ame, &lt;span class="o">(&lt;/span>C&lt;span class="o">)&lt;/span>omment, &lt;span class="o">(&lt;/span>E&lt;span class="o">)&lt;/span>mail or &lt;span class="o">(&lt;/span>O&lt;span class="o">)&lt;/span>kay/&lt;span class="o">(&lt;/span>Q&lt;span class="o">)&lt;/span>uit? O
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># One optional password will be prompted for the encryption key&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">We need to generate a lot of random bytes. It is a good idea to perform
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">some other action &lt;span class="o">(&lt;/span>&lt;span class="nb">type&lt;/span> on the keyboard, move the mouse, utilize the
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">disks&lt;span class="o">)&lt;/span> during the prime generation&lt;span class="p">;&lt;/span> this gives the random number
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">generator a better chance to gain enough entropy.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># One optional password will be prompted for the signing key&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">We need to generate a lot of random bytes. It is a good idea to perform
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">some other action &lt;span class="o">(&lt;/span>&lt;span class="nb">type&lt;/span> on the keyboard, move the mouse, utilize the
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">disks&lt;span class="o">)&lt;/span> during the prime generation&lt;span class="p">;&lt;/span> this gives the random number
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">generator a better chance to gain enough entropy.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: revocation certificate stored as &lt;span class="s1">&amp;#39;~/.gnupg/openpgp-revocs.d/C49BCFA8706203B8A03BF3A22EC378BC8416920D.rev&amp;#39;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">public and secret key created and signed.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">pub rsa4096 2024-01-10 &lt;span class="o">[&lt;/span>SC&lt;span class="o">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> C49BCFA8706203B8A03BF3A22EC378BC8416920D
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">uid John Doe &lt;span class="o">(&lt;/span>Personal encryption and signing GPG key&lt;span class="o">)&lt;/span> &amp;lt;john.doe@somewhere.com&amp;gt;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">sub rsa4096 2024-01-10 &lt;span class="o">[&lt;/span>E&lt;span class="o">]&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="check-for-your-key-pair">Check for your key pair&lt;/h3>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ gpg --list-signatures
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">~/.gnupg/pubring.kbx
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">-----------------------------
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">pub rsa4096 2024-01-10 &lt;span class="o">[&lt;/span>SC&lt;span class="o">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> C49BCFA8706203B8A03BF3A22EC378BC8416920D
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">uid &lt;span class="o">[&lt;/span>ultimate&lt;span class="o">]&lt;/span> John Doe &lt;span class="o">(&lt;/span>Personal encryption and signing GPG key&lt;span class="o">)&lt;/span> &amp;lt;john.doe@somewhere.com&amp;gt;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">sig &lt;span class="m">3&lt;/span> 2EC378BC8416920D 2024-01-10 &lt;span class="o">[&lt;/span>self-signature&lt;span class="o">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">sub rsa4096 2024-01-10 &lt;span class="o">[&lt;/span>E&lt;span class="o">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">sig 2EC378BC8416920D 2024-01-10 &lt;span class="o">[&lt;/span>self-signature&lt;span class="o">]&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="export-your-key-pair">Export your key pair&lt;/h3>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Public key&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ gpg --armor --export 2EC378BC8416920D &amp;gt; john_doe_public_gpg_key.asc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Private key&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ gpg --armor --export-secret-keys 2EC378BC8416920D &amp;gt; john_doe_private_gpg_key.asc
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="remove-keys">Remove keys&lt;/h3>
+&lt;p>Now that we have the key pair, let&amp;rsquo;s store it somewhere safe and let&amp;rsquo;s remove the keys to pretend we are importing someone else&amp;rsquo;s key to encrypt something for them.&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ gpg --delete-keys 2EC378BC8416920D
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">pub rsa4096/2EC378BC8416920D 2024-01-10 John Doe &lt;span class="o">(&lt;/span>Personal encryption and signing GPG key&lt;span class="o">)&lt;/span> &amp;lt;john.doe@somewhere.com&amp;gt;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Delete this key from the keyring? &lt;span class="o">(&lt;/span>y/N&lt;span class="o">)&lt;/span> y
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ gpg --delete-secret-keys 2EC378BC8416920D
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">sec rsa4096/2EC378BC8416920D 2024-01-10 John Doe &lt;span class="o">(&lt;/span>Personal encryption and signing GPG key&lt;span class="o">)&lt;/span> &amp;lt;john.doe@somewhere.com&amp;gt;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Delete this key from the keyring? &lt;span class="o">(&lt;/span>y/N&lt;span class="o">)&lt;/span> y
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">This is a secret key! - really delete? &lt;span class="o">(&lt;/span>y/N&lt;span class="o">)&lt;/span> y
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="import-public-keys">Import public keys&lt;/h3>
+&lt;p>Let&amp;rsquo;s say you want to send to John Doe something that only they can read. You would import their public key like this:&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ gpg --import john_doe_public_gpg_key.asc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: key 2EC378BC8416920D: public key &lt;span class="s2">&amp;#34;John Doe (Personal encryption and signing GPG key) &amp;lt;john.doe@somewhere.com&amp;gt;&amp;#34;&lt;/span> imported
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: Total number processed: &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: imported: &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="encrypt">Encrypt&lt;/h3>
+&lt;p>With the public key available, you can encrypt some content as follows:&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ &lt;span class="nb">echo&lt;/span> &lt;span class="s2">&amp;#34;my secret message&amp;#34;&lt;/span> &amp;gt; not_so_secret_message.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ gpg --encrypt --recipient 2EC378BC8416920D --output secret_message.txt.asc not_so_secret_message.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Check for the encrypted content&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ cat secret_message.txt.asc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">───────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> │ File: secret_message.txt.asc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="m">1&lt;/span> │ �^B^L^C^L&amp;gt;�
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="m">2&lt;/span> │ ��ѿ^A^P^@��9&lt;span class="o">=&lt;/span>^SJ� ^X�-��^Y^Z���s��v&lt;span class="o">[&lt;/span>�x�^G�^OutI&lt;span class="o">)&lt;/span>rx�����n��ψHZI�����L^W�p e���Kyz^S��&lt;span class="p">&amp;amp;&lt;/span>��^Y?��9�רP��S��݈^m�is�&amp;lt;�B���q~^U����w^Nب�:^M����c&lt;span class="o">]&lt;/span>��&lt;span class="o">[&lt;/span>L�^?&lt;span class="se">\�&lt;/span>5�I�^Z�Q&lt;span class="s1">&amp;#39;�^V����^W�^@+�N�0�XF�ޜߋu�ݻ5�,�X9@�� ���$�^K�r� ���N�&amp;amp;��}�
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="s1"> │ �b�^Wkֿ#bXQp������^G^��VN�^U}(^Ro�m^K��^Y^B��r�Oy`��^G�s���&amp;gt;�m�$^R�U%^^^Z�^]ѥ{���}��O���t^QCI�-��]t����4v�D��7���^F�}):Y�-^Y_��^@�ۿX^W�^US�^B��^^^Z�Y���N��&amp;lt;�N!�3�^]�^R�_G^Xet������0^T^N^]^UH^E^?�h�yiB�
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="s1"> 3 │ h�c$ͤb�^BIЍ��^X�4��^@�&amp;gt;g�V����+=�*^]��|��WQ�x��^Fl��7��������q�^KQ�?�#����bf^PP ��d��%�̀u^Z�1�N^B�h�we^Y�^@,^A^^iA�$��p� T&amp;#39;&lt;/span>�k9�a�$��K^_��&lt;span class="se">\H&lt;/span>��&lt;span class="o">[&lt;/span>^Uԓ^A ^B^P��ù y��^N������4R5��$&lt;span class="se">\y&lt;/span>���U��p��V�^V���bC&lt;span class="o">}&lt;/span>.�j�i&lt;span class="sb">`&lt;/span>��^B��^Pb��^L^@�Ī
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="m">4&lt;/span> │ �2�5��N��O�&lt;span class="p">;&lt;/span>�&lt;span class="o">[&lt;/span>ǆi&lt;span class="o">]&lt;/span>^Df�^~�W^D6W^O�ƔQ��խAl�^T�E��Q^C�^&lt;span class="o">]&lt;/span>&lt;span class="sb">`&lt;/span>����~�^X�Խ���^�Zq�^Q��KːB�
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">───────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>Now, you can share the encrypted content with John Doe. Now imagine that they want to decrypt the message from a new computer and they would need to import their private key. They would do it like:&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ gpg --import john_doe_private_gpg_key.asc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: key 2EC378BC8416920D: &lt;span class="s2">&amp;#34;John Doe (Personal encryption and signing GPG key) &amp;lt;john.doe@somewhere.com&amp;gt;&amp;#34;&lt;/span> not changed
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: key 2EC378BC8416920D: secret key imported
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: Total number processed: &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: unchanged: &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: secret keys read: &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">gpg: secret keys imported: &lt;span class="m">1&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>Once the secret key is on the keychain, the decryption can be done as follows:&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ gpg --decrypt --output decrypted_message.txt secret_message.txt.asc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># See the original content&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ cat decrypted_message.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">───────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> │ File: decrypted_message.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="m">1&lt;/span> │ my secret message
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">───────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="using-gpg-as-a-security-measure">Using GPG as a security measure&lt;/h2>
+&lt;p>Besides playing around with encrypted messages, GPG is used in another immensely useful feature in the routine of a software engineer or anyone using GitHub.&lt;/p>
+&lt;p>Let&amp;rsquo;s look at an example of its capabilities. In GitHub, you can &lt;a href="https://github.com/settings/keys">store your public key&lt;/a> and then use &lt;code>~/.gitconfig&lt;/code> to specify which private key should be used to sign the commit.&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-toml" data-lang="toml">&lt;span class="line">&lt;span class="cl">&lt;span class="c"># ~/.gitconfig&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">[&lt;/span>&lt;span class="nx">user&lt;/span>&lt;span class="p">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nx">email&lt;/span> &lt;span class="p">=&lt;/span> &lt;span class="nx">john&lt;/span>&lt;span class="p">.&lt;/span>&lt;span class="nx">doe&lt;/span>&lt;span class="err">@&lt;/span>&lt;span class="nx">somewhere&lt;/span>&lt;span class="p">.&lt;/span>&lt;span class="nx">com&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nx">name&lt;/span> &lt;span class="p">=&lt;/span> &lt;span class="nx">John&lt;/span> &lt;span class="nx">Doe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nx">signingkey&lt;/span> &lt;span class="p">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="nx">x2EC378BC8416920D&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">[&lt;/span>&lt;span class="nx">commit&lt;/span>&lt;span class="p">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nx">gpgsign&lt;/span> &lt;span class="p">=&lt;/span> &lt;span class="nx">True&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>This local git configuration plus the &lt;code>Flag unsigned commits as unverified&lt;/code> checked in the &lt;a href="https://github.com/settings/keys">aforementioned feature&lt;/a> would display a &lt;code>Verified&lt;/code> badge in all of your signed commits while making commits you did not sign &lt;code>Unverified&lt;/code>. Such a feature would e.g. prevent &lt;a href="https://github.com/jayphelps/git-blame-someone-else">git-blame-someone-else&lt;/a> from being used against you like it was with Linus Torvalds 🤦&lt;/p>
+&lt;h3 id="an-extra-mile">An extra mile&lt;/h3>
+&lt;p>GPG keys (and SSH keys too) can be stored on smart cards like a &lt;a href="https://support.yubico.com/hc/en-us/articles/360013790259-Using-Your-YubiKey-with-OpenPGP">Yubikey&lt;/a>. This adds an extra layer of security by preventing the use of a file that can be stolen by some malware on your computer.&lt;/p>
+&lt;h2 id="conclusion">Conclusion&lt;/h2>
+&lt;ul>
+&lt;li>You should set a password for your keys
+&lt;ul>
+&lt;li>This ensures that even if the file is stolen, people pretending to be you won&amp;rsquo;t be able to decrypt or sign anything on your behalf&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>You should have a right to privacy&lt;/li>
+&lt;li>Better safe than sorry&lt;/li>
+&lt;/ul>
+&lt;p>If you liked this article, import my &lt;a href="https://www.7onn.dev/tom.asc">public GPG key&lt;/a> and send me some encrypted message &amp;lt;3&lt;/p></description></item><item><title>Efficiency and performance</title><link>https://www.7onn.dev/post/efficiency-and-performance/</link><pubDate>Sat, 05 Feb 2022 09:00:00 -0300</pubDate><author>Tom M G</author><guid>https://www.7onn.dev/post/efficiency-and-performance/</guid><description>
 &lt;blockquote>
 &lt;p>This following content is a transcript from &lt;a href="https://books.google.com.br/books/about/Site_Reliability_Engineering.html?id=tYrPCwAAQBAJ">Site Reliability Engineering&lt;/a> with some, maybe none, personal adjustments.&lt;/p>
 &lt;/blockquote>
