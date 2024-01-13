@@ -188,7 +188,7 @@ got 4 sent 4
 ```
 
 ## Conclusion
-TCP is nice, it is one of the core protocols of the IP stack, it operates on the [OSI model's L4 (transport layer)][osi-wiki], and it provides a reliable connection between two parties on a network through a "handshake", i.e. the server acknowledges the incoming client connection and the client is sure that the content will arrive at its destination. It also ensures that data  arrives in the same order as it was sent. 
+TCP is nice, it is one of the core protocols of the IP stack, it operates on the [OSI model's L4 (transport layer)][osi-wiki], and it provides a reliable connection between two parties on a network through a "handshake", i.e. the server acknowledges the incoming client connection and the client is sure that the content will arrive at its destination. It also ensures that data  arrives in the same order as it was sent. **That's the reason why `conn.Read(buffer)` processed the rest of the payload from the previous iteration**.
 
 However, because it abstracts nothing but byte streams, it becomes a burden to reason the payload (unlike when we send e.g. json over http).
 
