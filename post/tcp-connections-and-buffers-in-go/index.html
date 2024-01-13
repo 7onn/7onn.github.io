@@ -1,0 +1,282 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=theme-color content="dark"><title>TCP Connections and Buffers in Go | 📜🧙‍♂️ tom's blog</title><link rel=stylesheet href=/sass/main.min.b81b77bfef641cdef5a77f4a7bb221547def6cea9b73ab29b5fed4c98707f2a8.css></head><body class=dark><nav class=navbar><div class=container><div class=flex><div><a class=brand href=/>📜🧙‍♂️ tom's blog</a></div><div class=flex><a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button></div></div></div></nav><main><div class=container><article><header class=article-header><div class=thumb><div><h1>TCP Connections and Buffers in Go</h1><div class=post-meta><div>By Tom M G on <time>January 12, 2024</time></div><div class=tags><a href=/tags/engineering/>engineering</a>
+<a href=/tags/go/>go</a>
+<a href=/tags/golang/>golang</a>
+<a href=/tags/tcp/>tcp</a>
+<a href=/tags/connections/>connections</a>
+<a href=/tags/buffers/>buffers</a></div></div></div></div></header></article><div class=article-post><h2 id=introduction>Introduction</h2><p>It&rsquo;s a Friday, but I&rsquo;m on call, so I can&rsquo;t go out with my friends. Also, my New Year&rsquo;s resolution for 2024 was to study and write more. So, here&rsquo;s this post.</p><p>Software engineers are are usually very keen on common internet protocols like HTTP(S), WebSocket (which is an HTTP connection that stays alive even after the server has responded), and gRPC. But then I thought &ldquo;I&rsquo;ve never written a TCP server&rdquo; and I decided to do one.</p><h2 id=hands-on>Hands on!</h2><p>I have written the following server</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=c1>// server.go
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=kn>package</span> <span class=nx>main</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;fmt&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;net&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;os&#34;</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=nf>main</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>listener</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>net</span><span class=p>.</span><span class=nf>Listen</span><span class=p>(</span><span class=s>&#34;tcp&#34;</span><span class=p>,</span> <span class=s>&#34;localhost:2121&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;%+v\n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=nx>os</span><span class=p>.</span><span class=nf>Exit</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>	<span class=k>defer</span> <span class=nx>listener</span><span class=p>.</span><span class=nf>Close</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>fmt</span><span class=p>.</span><span class=nf>Println</span><span class=p>(</span><span class=s>&#34;tcp server is listening on ::2121&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=c1>// blocks the execution until a connection arrives
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>conn</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>listener</span><span class=p>.</span><span class=nf>Accept</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;%+v\n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=nx>os</span><span class=p>.</span><span class=nf>Exit</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>		<span class=k>go</span> <span class=kd>func</span><span class=p>(</span><span class=nx>conn</span> <span class=nx>net</span><span class=p>.</span><span class=nx>Conn</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=k>defer</span> <span class=nx>conn</span><span class=p>.</span><span class=nf>Close</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>			<span class=nx>i</span> <span class=o>:=</span> <span class=mi>0</span>
+</span></span><span class=line><span class=cl>			<span class=k>for</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>				<span class=nx>i</span><span class=o>++</span>
+</span></span><span class=line><span class=cl>				<span class=nx>buffer</span> <span class=o>:=</span> <span class=nb>make</span><span class=p>([]</span><span class=kt>byte</span><span class=p>,</span> <span class=mi>8</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>				<span class=nx>n</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>conn</span><span class=p>.</span><span class=nf>Read</span><span class=p>(</span><span class=nx>buffer</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>				<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>					<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;%+v\n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>					<span class=k>return</span>
+</span></span><span class=line><span class=cl>				<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>				<span class=nx>n</span><span class=p>,</span> <span class=nx>err</span> <span class=p>=</span> <span class=nx>conn</span><span class=p>.</span><span class=nf>Write</span><span class=p>(</span><span class=nx>buffer</span><span class=p>[:</span><span class=nx>n</span><span class=p>])</span>
+</span></span><span class=line><span class=cl>				<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>					<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;%+v\n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>					<span class=k>return</span>
+</span></span><span class=line><span class=cl>				<span class=p>}</span>
+</span></span><span class=line><span class=cl>				<span class=nx>fmt</span><span class=p>.</span><span class=nf>Println</span><span class=p>(</span><span class=s>&#34;got&#34;</span><span class=p>,</span> <span class=nb>string</span><span class=p>(</span><span class=nx>buffer</span><span class=p>[:</span><span class=nx>n</span><span class=p>]),</span> <span class=s>&#34;sent&#34;</span><span class=p>,</span> <span class=nb>string</span><span class=p>(</span><span class=nx>buffer</span><span class=p>[:</span><span class=nx>n</span><span class=p>]))</span>
+</span></span><span class=line><span class=cl>			<span class=p>}</span>
+</span></span><span class=line><span class=cl>		<span class=p>}(</span><span class=nx>conn</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>This server uses the Golang <code>net</code> package and listens via the TCP protocol on port 2121. Then it waits for a client to connect to it, and when the connection happens, it triggers a new Go routine to handle it. It can only read the first 8 bytes (8 characters) sent by the client and just reply back what it got.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>$ go run server.go
+</span></span><span class=line><span class=cl>...
+</span></span><span class=line><span class=cl>tcp server is listening on ::2121
+</span></span></code></pre></td></tr></table></div></div><p>Ok, its listening and apparently ready to receive connections. Now, let&rsquo;s create a client to interact with it.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=c1>// client.go
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=kn>package</span> <span class=nx>main</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;fmt&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;io&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;net&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;os&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=s>&#34;time&#34;</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=nf>main</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>conn</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>net</span><span class=p>.</span><span class=nf>Dial</span><span class=p>(</span><span class=s>&#34;tcp&#34;</span><span class=p>,</span> <span class=s>&#34;localhost:2121&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;error connecting to server %+v \n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=nx>os</span><span class=p>.</span><span class=nf>Exit</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>	<span class=k>defer</span> <span class=nx>conn</span><span class=p>.</span><span class=nf>Close</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>	<span class=nx>i</span> <span class=o>:=</span> <span class=mi>0</span>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>i</span><span class=o>++</span>
+</span></span><span class=line><span class=cl>		<span class=nx>n</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>conn</span><span class=p>.</span><span class=nf>Write</span><span class=p>([]</span><span class=nb>byte</span><span class=p>(</span><span class=nx>fmt</span><span class=p>.</span><span class=nf>Sprintf</span><span class=p>(</span><span class=s>&#34;%d&#34;</span><span class=p>,</span> <span class=nx>i</span><span class=p>)))</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;%+v\n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=nx>os</span><span class=p>.</span><span class=nf>Exit</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>		<span class=nx>buffer</span> <span class=o>:=</span> <span class=nb>make</span><span class=p>([]</span><span class=kt>byte</span><span class=p>,</span> <span class=mi>8</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=nx>n</span><span class=p>,</span> <span class=nx>err</span> <span class=p>=</span> <span class=nx>conn</span><span class=p>.</span><span class=nf>Read</span><span class=p>(</span><span class=nx>buffer</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=o>&amp;&amp;</span> <span class=nx>err</span> <span class=o>!=</span> <span class=nx>io</span><span class=p>.</span><span class=nx>EOF</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>fmt</span><span class=p>.</span><span class=nf>Printf</span><span class=p>(</span><span class=s>&#34;%+v\n&#34;</span><span class=p>,</span> <span class=nx>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=nx>os</span><span class=p>.</span><span class=nf>Exit</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>		<span class=nx>fmt</span><span class=p>.</span><span class=nf>Println</span><span class=p>(</span><span class=s>&#34;sent&#34;</span><span class=p>,</span> <span class=nx>i</span><span class=p>,</span> <span class=s>&#34;got&#34;</span><span class=p>,</span> <span class=nb>string</span><span class=p>(</span><span class=nx>buffer</span><span class=p>[:</span><span class=nx>n</span><span class=p>]))</span>
+</span></span><span class=line><span class=cl>		<span class=nx>time</span><span class=p>.</span><span class=nf>Sleep</span><span class=p>(</span><span class=nx>time</span><span class=p>.</span><span class=nx>Second</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>This client also uses the Golang <code>net</code> package and dials <code>localhost:2121</code> using the TCP protocol. If the server is up, the connection should succeed and the client will start an infinite loop. For each iteration, it will increment an INT value and send it as a payload to the server, printing what it requested and what it got. It also sleeps briefly so we don&rsquo;t flood the terminal.</p><p>Open a new terminal session and run it:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>$ go run client.go
+</span></span><span class=line><span class=cl>...
+</span></span><span class=line><span class=cl>sent <span class=m>1</span> got <span class=m>1</span>
+</span></span><span class=line><span class=cl>sent <span class=m>2</span> got <span class=m>2</span>
+</span></span><span class=line><span class=cl>sent <span class=m>3</span> got <span class=m>3</span>
+</span></span><span class=line><span class=cl>sent <span class=m>4</span> got <span class=m>4</span>
+</span></span><span class=line><span class=cl>sent <span class=m>5</span> got <span class=m>5</span>
+</span></span><span class=line><span class=cl>sent <span class=m>6</span> got <span class=m>6</span>
+</span></span><span class=line><span class=cl>sent <span class=m>7</span> got <span class=m>7</span>
+</span></span></code></pre></td></tr></table></div></div><p>You should see the following server&rsquo;s output</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>tcp server is listening on ::2121
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>2</span> sent <span class=m>2</span>
+</span></span><span class=line><span class=cl>got <span class=m>3</span> sent <span class=m>3</span>
+</span></span><span class=line><span class=cl>got <span class=m>4</span> sent <span class=m>4</span>
+</span></span><span class=line><span class=cl>got <span class=m>5</span> sent <span class=m>5</span>
+</span></span><span class=line><span class=cl>got <span class=m>6</span> sent <span class=m>6</span>
+</span></span><span class=line><span class=cl>got <span class=m>7</span> sent <span class=m>7</span>
+</span></span></code></pre></td></tr></table></div></div><p>Ok, cool! Now, what? We have established a connection between the client and the server, and they commnunicate using the TCP protocol. But, what is the problem with this code? The buffer can only handle 8 characters and nothing more. So you might think &ldquo;it would break when it reached 10^9, i.e. 100 million seconds later&rdquo;, right? I thought so! But to my surprise something else happened. Instead of waiting for ~38 months, I decided to reduce the buffer size to 1 on the server side (server.go#L32). And then ran it again.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>$ go run server.go
+</span></span><span class=line><span class=cl>...
+</span></span><span class=line><span class=cl>tcp server is listening on ::2121
+</span></span></code></pre></td></tr></table></div></div><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>$ go run client.go
+</span></span><span class=line><span class=cl>...
+</span></span><span class=line><span class=cl>sent <span class=m>7</span> got <span class=m>7</span>
+</span></span><span class=line><span class=cl>sent <span class=m>8</span> got <span class=m>8</span>
+</span></span><span class=line><span class=cl>sent <span class=m>9</span> got <span class=m>9</span>
+</span></span><span class=line><span class=cl>sent <span class=m>10</span> got <span class=m>10</span>
+</span></span><span class=line><span class=cl>sent <span class=m>11</span> got <span class=m>1</span>
+</span></span><span class=line><span class=cl>sent <span class=m>12</span> got <span class=m>1</span>
+</span></span><span class=line><span class=cl>sent <span class=m>13</span> got <span class=m>12</span>
+</span></span><span class=line><span class=cl>sent <span class=m>14</span> got <span class=m>13</span>
+</span></span><span class=line><span class=cl>sent <span class=m>15</span> got <span class=m>14</span>
+</span></span><span class=line><span class=cl>sent <span class=m>16</span> got <span class=m>15</span>
+</span></span></code></pre></td></tr></table></div></div><p>By the moment the digit gets reaches length 2, we notice weird responses. The server filled what it could in the buffer of size 1 and proceeded with the response. Leaving for the next <code>conn.Read(buffer)</code>, in the next iteration, the job of processing the rest of the previous payload.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># server.go</span>
+</span></span><span class=line><span class=cl>got <span class=m>7</span> sent <span class=m>7</span>
+</span></span><span class=line><span class=cl>got <span class=m>8</span> sent <span class=m>8</span>
+</span></span><span class=line><span class=cl>got <span class=m>9</span> sent <span class=m>9</span>
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>0</span> sent <span class=m>0</span>
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>2</span> sent <span class=m>2</span>
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>3</span> sent <span class=m>3</span>
+</span></span><span class=line><span class=cl>got <span class=m>1</span> sent <span class=m>1</span>
+</span></span><span class=line><span class=cl>got <span class=m>4</span> sent <span class=m>4</span>
+</span></span></code></pre></td></tr></table></div></div><h2 id=conclusion>Conclusion</h2><p>TCP is nice, it is one of the core protocols of the IP stack, it operates on the <a href=https://en.wikipedia.org/wiki/OSI_model>OSI model&rsquo;s L4 (transport layer)</a>, and it provides a reliable connection between two parties on a network through a &ldquo;handshake&rdquo;, i.e. the server acknowledges the incoming client connection and the client is sure that the content will arrive at its destination. It also ensures that data arrives in the same order as it was sent.</p><p>However, because it abstracts nothing but byte streams, it becomes a burden to reason the payload (unlike when we send e.g. json over http).</p><p>If you only need to send short, schemaless text messages between two parties on a network, consider using TCP instead <a href=https://en.wikipedia.org/wiki/Application_layer>L7 protocols</a>. And if you can afford to lose some of the messages, <a href=https://en.wikipedia.org/wiki/User_Datagram_Protocol>UDP</a> would deliver them even with a better transmission performance, as it would skip some communication steps and &ldquo;just send it&rdquo;.</p><p>I&rsquo;ll play around with UDP in Go in another post.</p></div></div><div class=container><nav class="flex container suggested"><a rel=prev href=/post/gpg-encryption/ title="Previous post (older)"><span>Previous</span>
+GPG encryption and how to use it</a></nav></div></main></main><footer class="footer flex"><section class=container><nav class=footer-links><a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a></nav></section><script async src=/js/features.min.fdb064613b89cfdaaa43fcf86c021408578dd158cf0accad7cc50e1913005d12.js></script></footer></body></html>
