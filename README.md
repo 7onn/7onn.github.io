@@ -8,3 +8,4 @@ This repository stores projects, articles, and anything else of my blog
 # https://gohugo.io/getting-started/installing/#debian-and-ubuntu
 hugo serve -D
 ```
+;;
