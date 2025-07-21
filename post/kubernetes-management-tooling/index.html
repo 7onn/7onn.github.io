@@ -1,0 +1,134 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=theme-color content="dark"><title>Kubernetes management tooling | 📜🧙‍♂️ tom's blog</title><link rel=stylesheet href=/sass/main.min.b81b77bfef641cdef5a77f4a7bb221547def6cea9b73ab29b5fed4c98707f2a8.css></head><body class=dark><nav class=navbar><div class=container><div class=flex><div><a class=brand href=/>📜🧙‍♂️ tom's blog</a></div><div class=flex><a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button></div></div></div></nav><main><div class=container><article><header class=article-header><div class=thumb><div><h1>Kubernetes management tooling</h1><div class=post-meta><div>By Tom M G on <time>July 21, 2025</time></div><div class=tags><a href=/tags/engineering/>engineering</a>
+<a href=/tags/kubernetes/>kubernetes</a>
+<a href=/tags/devops/>devops</a>
+<a href=/tags/sre/>sre</a></div></div></div></div></header></article><div class=article-post><h2 id=introduction>Introduction</h2><p>Managing Kubernetes clusters means interacting with dozens/hundreds/thousands of resources on a daily basis. These can be quite cumbersome to deal with and the amount of commands to memorize is insanely extensive. To alleviate this load, I&rsquo;ll describe here what I use to make this easier.</p><h2 id=fubectl>Fubectl</h2><p><a href=https://github.com/kubermatic/fubectl>This</a> brings many nice aliases that will speed things up in terms of typing;</p><p>My highlighted ones are</p><ol><li><code>k</code><ul><li>Shorter for kubectl</li></ul></li><li><code>kcs</code><ul><li>Change active cluster e.g. docker-desktop,staging,production</li></ul></li><li><code>kcns</code><ul><li>Change active namespace e.g. default,service-a,service-b</li></ul></li></ol><p>It does also bring important variables <code>$(kube_ctx_namespace)</code> that can be used in PS1 for showing the current context and namespace.</p><h2 id=ps1>PS1</h2><p>This is extremely helpful to display on your terminal, before you run any command, what&rsquo;s the context in which you would run it. e.g.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># &#34;staging&#34; is the cluster set by &#34;kcs&#34;</span>
+</span></span><span class=line><span class=cl><span class=c1># &#34;default&#34; is the namespace set by &#34;kcns&#34;</span>
+</span></span><span class=line><span class=cl>/Users/tom/dev/7onn.github.io  main ± ⛵staging/default Montag 2025-07-21 22:11:30 +0200
+</span></span><span class=line><span class=cl>$ kubectl --help
+</span></span><span class=line><span class=cl>...
+</span></span></code></pre></td></tr></table></div></div><p>There are easy solutions that can display these information for you like <a href=https://github.com/romkatv/powerlevel10k>p10k</a> or <a href=https://starship.rs>starship</a>. But if you are looking for a low overhead on your terminal performance, here&rsquo;s how I do <a href=https://github.com/7onn/osdot/blob/main/.zsh/ps1.zsh>it</a>.</p><p>Or simply add this to you <code>.zshrc</code></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=nv>RED</span><span class=o>=</span><span class=s2>&#34;\033[0;31m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>GREEN</span><span class=o>=</span><span class=s2>&#34;\033[0;32m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>YELLOW</span><span class=o>=</span><span class=s2>&#34;\033[0;33m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>BLUE</span><span class=o>=</span><span class=s2>&#34;\033[0;34m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>MAGENTA</span><span class=o>=</span><span class=s2>&#34;\033[0;35m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>CYAN</span><span class=o>=</span><span class=s2>&#34;\033[0;36m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>WHITE</span><span class=o>=</span><span class=s2>&#34;\033[0;37m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>RESET</span><span class=o>=</span><span class=s2>&#34;\033[0m&#34;</span>
+</span></span><span class=line><span class=cl><span class=nv>PURPLE</span><span class=o>=</span><span class=s2>&#34;\033[38;5;183m&#34;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>function</span> dir_ps1<span class=o>()</span> <span class=o>{</span>
+</span></span><span class=line><span class=cl>  <span class=nb>echo</span> -e <span class=s2>&#34;</span><span class=si>${</span><span class=nv>PURPLE</span><span class=si>}</span><span class=s2>⭐</span><span class=k>$(</span><span class=nb>pwd</span><span class=k>)</span><span class=si>${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl><span class=o>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>function</span> git_ps1<span class=o>()</span> <span class=o>{</span>
+</span></span><span class=line><span class=cl>  <span class=nv>branch</span><span class=o>=</span><span class=k>$(</span>git branch 2&gt;/dev/null <span class=p>|</span> sed -n <span class=s1>&#39;/^\*/s/^\* //p&#39;</span><span class=k>)</span>
+</span></span><span class=line><span class=cl>  <span class=k>if</span> <span class=o>[[</span> -n <span class=s2>&#34;</span><span class=nv>$branch</span><span class=s2>&#34;</span> <span class=o>]]</span><span class=p>;</span> <span class=k>then</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=o>[[</span> -n <span class=s2>&#34;</span><span class=k>$(</span>git diff --name-only HEAD<span class=k>)</span><span class=s2>&#34;</span> <span class=o>]]</span><span class=p>;</span> <span class=k>then</span>
+</span></span><span class=line><span class=cl>      <span class=nb>echo</span> -e <span class=s2>&#34;</span><span class=si>${</span><span class=nv>YELLOW</span><span class=si>}</span><span class=s2>\UE0A0 </span><span class=si>${</span><span class=nv>branch</span><span class=si>}</span><span class=s2> ±</span><span class=si>${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>
+</span></span></span><span class=line><span class=cl><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=k>else</span>
+</span></span><span class=line><span class=cl>      <span class=nb>echo</span> -e <span class=s2>&#34;</span><span class=si>${</span><span class=nv>YELLOW</span><span class=si>}</span><span class=s2>\UE0A0 </span><span class=si>${</span><span class=nv>RESET</span><span class=si>}${</span><span class=nv>branch</span><span class=si>}${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>
+</span></span></span><span class=line><span class=cl><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=k>fi</span>
+</span></span><span class=line><span class=cl>  <span class=k>fi</span>
+</span></span><span class=line><span class=cl><span class=o>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>function</span> kube_ps1<span class=o>()</span> <span class=o>{</span>
+</span></span><span class=line><span class=cl>  <span class=nb>local</span> <span class=nv>ctx</span><span class=o>=</span><span class=s2>&#34;</span><span class=k>$(</span>kube_ctx_name<span class=k>)</span><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl>  <span class=k>if</span> <span class=o>[[</span> -n <span class=s2>&#34;</span><span class=nv>$ctx</span><span class=s2>&#34;</span> <span class=o>]]</span><span class=p>;</span> <span class=k>then</span>
+</span></span><span class=line><span class=cl>    <span class=nb>local</span> <span class=nv>ns</span><span class=o>=</span><span class=s2>&#34;</span><span class=k>$(</span>kube_ctx_namespace<span class=k>)</span><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=o>[[</span> <span class=s2>&#34;</span><span class=nv>$ctx</span><span class=s2>&#34;</span> <span class=o>==</span> *<span class=s2>&#34;production&#34;</span>* <span class=o>]]</span><span class=p>;</span> <span class=k>then</span>
+</span></span><span class=line><span class=cl>      <span class=nb>echo</span> -e <span class=s2>&#34;</span><span class=si>${</span><span class=nv>RED</span><span class=si>}</span><span class=s2>⛵</span><span class=si>${</span><span class=nv>ctx</span><span class=si>}${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>/</span><span class=si>${</span><span class=nv>CYAN</span><span class=si>}${</span><span class=nv>ns</span><span class=si>}${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=k>else</span>
+</span></span><span class=line><span class=cl>      <span class=nb>echo</span> -e <span class=s2>&#34;</span><span class=si>${</span><span class=nv>GREEN</span><span class=si>}</span><span class=s2>⛵</span><span class=si>${</span><span class=nv>ctx</span><span class=si>}${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>/</span><span class=si>${</span><span class=nv>CYAN</span><span class=si>}${</span><span class=nv>ns</span><span class=si>}${</span><span class=nv>RESET</span><span class=si>}</span><span class=s2>&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=k>fi</span>
+</span></span><span class=line><span class=cl>  <span class=k>fi</span>
+</span></span><span class=line><span class=cl><span class=o>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>function</span> _update_ps1<span class=o>()</span> <span class=o>{</span>
+</span></span><span class=line><span class=cl>  <span class=nv>PS1</span><span class=o>=</span><span class=s2>&#34;%1 
+</span></span></span><span class=line><span class=cl><span class=s2></span><span class=k>$(</span>dir_ps1<span class=k>)</span><span class=s2> </span><span class=k>$(</span>git_ps1<span class=k>)</span><span class=s2> </span><span class=k>$(</span>kube_ps1<span class=k>)</span><span class=s2> </span><span class=k>$(</span>date +<span class=s1>&#39;%A %Y-%m-%d %H:%M:%S %z&#39;</span><span class=k>)</span><span class=s2>
+</span></span></span><span class=line><span class=cl><span class=s2></span>$<span class=s2> &#34;</span>
+</span></span><span class=line><span class=cl><span class=o>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>autoload -Uz add-zsh-hook
+</span></span><span class=line><span class=cl>add-zsh-hook precmd _update_ps1
+</span></span></code></pre></td></tr></table></div></div><p>imho, the nicest thing on this PS1 is that it prints &ldquo;production&rdquo; in red color to decrease your chances of running things in the wrong place.</p><h1 id=k9s>K9s</h1><p><a href=https://github.com/derailed/k9s>This</a> will help you to things quickly like e.g. jump through resources, switch between apps&rsquo; logs, port-forward, describe, edit, and delete.</p><p>My highlighted commands are</p><ol><li>Check most resource consuming pods</li></ol><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>$ k9s -A
+</span></span><span class=line><span class=cl>...
+</span></span><span class=line><span class=cl><span class=c1># Type :pods to search pods</span>
+</span></span><span class=line><span class=cl><span class=c1># Type SHIFT+C to sort by CPU</span>
+</span></span><span class=line><span class=cl><span class=c1># Type SHIFT+M to sort by Memory</span>
+</span></span></code></pre></td></tr></table></div></div><ol start=2><li>Check logs</li></ol><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>$ k9s
+</span></span><span class=line><span class=cl>...
+</span></span><span class=line><span class=cl><span class=c1># Type :pods, :deploy, :sts, :ds, :cj, or :job to search for workloads</span>
+</span></span><span class=line><span class=cl><span class=c1># Type &#34;l&#34; over the selected workload</span>
+</span></span><span class=line><span class=cl><span class=c1># Type &#34;w&#34; to print the whole log line</span>
+</span></span></code></pre></td></tr></table></div></div></div></div><div class=container><nav class="flex container suggested"><a rel=prev href=/post/tcp-connections-and-buffers-in-go/ title="Previous post (older)"><span>Previous</span>
+TCP Connections and Buffers in Go</a></nav></div></main></main><footer class="footer flex"><section class=container><nav class=footer-links><a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a></nav></section><script async src=/js/features.min.fdb064613b89cfdaaa43fcf86c021408578dd158cf0accad7cc50e1913005d12.js></script></footer></body></html>

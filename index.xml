@@ -1,4 +1,192 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>📜🧙‍♂️ tom's blog</title><link>https://www.7onn.dev/</link><description>Recent content on 📜🧙‍♂️ tom's blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Fri, 12 Jan 2024 19:00:00 +0100</lastBuildDate><atom:link href="https://www.7onn.dev/index.xml" rel="self" type="application/rss+xml"/><item><title>TCP Connections and Buffers in Go</title><link>https://www.7onn.dev/post/tcp-connections-and-buffers-in-go/</link><pubDate>Fri, 12 Jan 2024 19:00:00 +0100</pubDate><author>Tom M G</author><guid>https://www.7onn.dev/post/tcp-connections-and-buffers-in-go/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>📜🧙‍♂️ tom's blog</title><link>https://www.7onn.dev/</link><description>Recent content on 📜🧙‍♂️ tom's blog</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Mon, 21 Jul 2025 22:00:00 +0200</lastBuildDate><atom:link href="https://www.7onn.dev/index.xml" rel="self" type="application/rss+xml"/><item><title>Kubernetes management tooling</title><link>https://www.7onn.dev/post/kubernetes-management-tooling/</link><pubDate>Mon, 21 Jul 2025 22:00:00 +0200</pubDate><author>Tom M G</author><guid>https://www.7onn.dev/post/kubernetes-management-tooling/</guid><description>
+&lt;h2 id="introduction">Introduction&lt;/h2>
+&lt;p>Managing Kubernetes clusters means interacting with dozens/hundreds/thousands of resources on a daily basis. These can be quite cumbersome to deal with and the amount of commands to memorize is insanely extensive. To alleviate this load, I&amp;rsquo;ll describe here what I use to make this easier.&lt;/p>
+&lt;h2 id="fubectl">Fubectl&lt;/h2>
+&lt;p>&lt;a href="https://github.com/kubermatic/fubectl">This&lt;/a> brings many nice aliases that will speed things up in terms of typing;&lt;/p>
+&lt;p>My highlighted ones are&lt;/p>
+&lt;ol>
+&lt;li>&lt;code>k&lt;/code>
+&lt;ul>
+&lt;li>Shorter for kubectl&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>kcs&lt;/code>
+&lt;ul>
+&lt;li>Change active cluster e.g. docker-desktop,staging,production&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>kcns&lt;/code>
+&lt;ul>
+&lt;li>Change active namespace e.g. default,service-a,service-b&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;p>It does also bring important variables &lt;code>$(kube_ctx_namespace)&lt;/code> that can be used in PS1 for showing the current context and namespace.&lt;/p>
+&lt;h2 id="ps1">PS1&lt;/h2>
+&lt;p>This is extremely helpful to display on your terminal, before you run any command, what&amp;rsquo;s the context in which you would run it. e.g.&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># &amp;#34;staging&amp;#34; is the cluster set by &amp;#34;kcs&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># &amp;#34;default&amp;#34; is the namespace set by &amp;#34;kcns&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">/Users/tom/dev/7onn.github.io  main ± ⛵staging/default Montag 2025-07-21 22:11:30 +0200
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ kubectl --help
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>There are easy solutions that can display these information for you like &lt;a href="https://github.com/romkatv/powerlevel10k">p10k&lt;/a> or &lt;a href="https://starship.rs">starship&lt;/a>. But if you are looking for a low overhead on your terminal performance, here&amp;rsquo;s how I do &lt;a href="https://github.com/7onn/osdot/blob/main/.zsh/ps1.zsh">it&lt;/a>.&lt;/p>
+&lt;p>Or simply add this to you &lt;code>.zshrc&lt;/code>&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="nv">RED&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;31m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">GREEN&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;32m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">YELLOW&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;33m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">BLUE&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;34m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">MAGENTA&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;35m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">CYAN&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;36m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">WHITE&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0;37m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">RESET&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[0m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nv">PURPLE&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;\033[38;5;183m&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">function&lt;/span> dir_ps1&lt;span class="o">()&lt;/span> &lt;span class="o">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">echo&lt;/span> -e &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">PURPLE&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">⭐&lt;/span>&lt;span class="k">$(&lt;/span>&lt;span class="nb">pwd&lt;/span>&lt;span class="k">)&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">function&lt;/span> git_ps1&lt;span class="o">()&lt;/span> &lt;span class="o">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nv">branch&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="k">$(&lt;/span>git branch 2&amp;gt;/dev/null &lt;span class="p">|&lt;/span> sed -n &lt;span class="s1">&amp;#39;/^\*/s/^\* //p&amp;#39;&lt;/span>&lt;span class="k">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="o">[[&lt;/span> -n &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="nv">$branch&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span> &lt;span class="o">]]&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="k">then&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="o">[[&lt;/span> -n &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="k">$(&lt;/span>git diff --name-only HEAD&lt;span class="k">)&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span> &lt;span class="o">]]&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="k">then&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">echo&lt;/span> -e &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">YELLOW&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">\UE0A0 &lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">branch&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2"> ±&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">else&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">echo&lt;/span> -e &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">YELLOW&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">\UE0A0 &lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">branch&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">fi&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">fi&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">function&lt;/span> kube_ps1&lt;span class="o">()&lt;/span> &lt;span class="o">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">local&lt;/span> &lt;span class="nv">ctx&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="k">$(&lt;/span>kube_ctx_name&lt;span class="k">)&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="o">[[&lt;/span> -n &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="nv">$ctx&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span> &lt;span class="o">]]&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="k">then&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">local&lt;/span> &lt;span class="nv">ns&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="k">$(&lt;/span>kube_ctx_namespace&lt;span class="k">)&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="o">[[&lt;/span> &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="nv">$ctx&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span> &lt;span class="o">==&lt;/span> *&lt;span class="s2">&amp;#34;production&amp;#34;&lt;/span>* &lt;span class="o">]]&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="k">then&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">echo&lt;/span> -e &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">RED&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">⛵&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">ctx&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">/&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">CYAN&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">ns&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">else&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">echo&lt;/span> -e &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">GREEN&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">⛵&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">ctx&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">/&lt;/span>&lt;span class="si">${&lt;/span>&lt;span class="nv">CYAN&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">ns&lt;/span>&lt;span class="si">}${&lt;/span>&lt;span class="nv">RESET&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">fi&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">fi&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">function&lt;/span> _update_ps1&lt;span class="o">()&lt;/span> &lt;span class="o">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nv">PS1&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="s2">&amp;#34;%1
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="s2">&lt;/span>&lt;span class="k">$(&lt;/span>dir_ps1&lt;span class="k">)&lt;/span>&lt;span class="s2"> &lt;/span>&lt;span class="k">$(&lt;/span>git_ps1&lt;span class="k">)&lt;/span>&lt;span class="s2"> &lt;/span>&lt;span class="k">$(&lt;/span>kube_ps1&lt;span class="k">)&lt;/span>&lt;span class="s2"> &lt;/span>&lt;span class="k">$(&lt;/span>date +&lt;span class="s1">&amp;#39;%A %Y-%m-%d %H:%M:%S %z&amp;#39;&lt;/span>&lt;span class="k">)&lt;/span>&lt;span class="s2">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="s2">&lt;/span>$&lt;span class="s2"> &amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">autoload -Uz add-zsh-hook
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">add-zsh-hook precmd _update_ps1
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>imho, the nicest thing on this PS1 is that it prints &amp;ldquo;production&amp;rdquo; in red color to decrease your chances of running things in the wrong place.&lt;/p>
+&lt;h1 id="k9s">K9s&lt;/h1>
+&lt;p>&lt;a href="https://github.com/derailed/k9s">This&lt;/a> will help you to things quickly like e.g. jump through resources, switch between apps&amp;rsquo; logs, port-forward, describe, edit, and delete.&lt;/p>
+&lt;p>My highlighted commands are&lt;/p>
+&lt;ol>
+&lt;li>Check most resource consuming pods&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ k9s -A
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Type :pods to search pods&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Type SHIFT+C to sort by CPU&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Type SHIFT+M to sort by Memory&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="2">
+&lt;li>Check logs&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">$ k9s
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Type :pods, :deploy, :sts, :ds, :cj, or :job to search for workloads&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Type &amp;#34;l&amp;#34; over the selected workload&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Type &amp;#34;w&amp;#34; to print the whole log line&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div></description></item><item><title>TCP Connections and Buffers in Go</title><link>https://www.7onn.dev/post/tcp-connections-and-buffers-in-go/</link><pubDate>Fri, 12 Jan 2024 19:00:00 +0100</pubDate><author>Tom M G</author><guid>https://www.7onn.dev/post/tcp-connections-and-buffers-in-go/</guid><description>
 &lt;h2 id="introduction">Introduction&lt;/h2>
 &lt;p>It&amp;rsquo;s a Friday, but I&amp;rsquo;m on call, so I can&amp;rsquo;t go out with my friends. Also, my New Year&amp;rsquo;s resolution for 2024 was to study and write more. So, here&amp;rsquo;s this post.&lt;/p>
 &lt;p>Software engineers are are usually very keen on common internet protocols like HTTP(S), WebSocket (which is an HTTP connection that stays alive even after the server has responded), and gRPC. But then I thought &amp;ldquo;I&amp;rsquo;ve never written a TCP server&amp;rdquo; and I decided to do one.&lt;/p>
