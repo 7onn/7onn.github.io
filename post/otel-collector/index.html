@@ -1,0 +1,1366 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=theme-color content="dark"><title>Kubernetes metrics, logs, and traces via OpenTelemetry collector | 📜🧙‍♂️ tom's blog</title><link rel=stylesheet href=/sass/main.min.b81b77bfef641cdef5a77f4a7bb221547def6cea9b73ab29b5fed4c98707f2a8.css></head><body class=dark><nav class=navbar><div class=container><div class=flex><div><a class=brand href=/>📜🧙‍♂️ tom's blog</a></div><div class=flex><a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button></div></div></div></nav><main><div class=container><article><header class=article-header><div class=thumb><div><h1>Kubernetes metrics, logs, and traces via OpenTelemetry collector</h1><div class=post-meta><div>By Tom M G on <time>December 22, 2025</time></div><div class=tags><a href=/tags/engineering/>engineering</a>
+<a href=/tags/kubernetes/>kubernetes</a>
+<a href=/tags/devops/>devops</a>
+<a href=/tags/sre/>sre</a>
+<a href=/tags/open-telemetry/>open-telemetry</a>
+<a href=/tags/observability/>observability</a></div></div></div></div></header></article><div class=article-post><h1 id=the-problem>The Problem</h1><p>Observing distributed systems is not a trivial task. We have several machines running, each hosting workloads that minding their business, do network calls, and print logs. That makes one think &ldquo;how on earth am I gonna keep it together?&rdquo;.</p><h1 id=one-opinionated-solution>One opinionated solution</h1><p>Well, there&rsquo;s a widely adopted tool that works as a central piece, gracefully turning chaos into an ordered flow. It is called OpenTelemetry Collector, and this article approaches it in an opinionated way.</p><h1 id=architecture-overview>Architecture overview</h1><ul><li>One otel-collector runs as a DaemonSet to capture and process metrics, logs, and traces</li><li>One trace-collector runs as a Deployment to reconstruct traces across different nodes</li><li>Each node gets a subset of app metrics to scrape</li><li>Metrics are scraped from Apps, Kubernetes, and the Host itself, and then forwarded to Victoriametrics</li><li>Log files are tailed, and forwarded to Victorialogs</li><li>Traces are received from app instrumentation, glued together in trace-collector, and forwarded to Victoriatraces.<ul><li>They are also parsed to <code>calls_total</code> and <code>duration_milliseconds_.*</code> metrics</li></ul></li></ul><h1 id=introduction>Introduction</h1><p>The <a href=https://opentelemetry.io/docs/collector/>collector</a> has three main pieces that are responsible for orchestrating the telemetry flow. <a href=https://opentelemetry.io/docs/collector/components/receiver/>Receivers</a>, <a href=https://opentelemetry.io/docs/collector/components/processor/>Processors</a>, and <a href=https://opentelemetry.io/docs/collector/components/exporter/>Exporters</a>. OpenTelemetry Collector has this repo <a href=https://github.com/open-telemetry/opentelemetry-collector-contrib>opentelemetry-collector-contrib</a> that offers, abundantly, options of these three.</p><p>These three pieces are then orchestrated by a <a href=https://opentelemetry.io/docs/collector/architecture/#pipelines>Pipeline</a>, and for <code>traces &lt;> metrics</code>, transformed via <a href=https://opentelemetry.io/docs/collector/components/connector/>Connector</a>.</p><h1 id=installing-the-collector>Installing the collector</h1><p>The easiest way is via the <a href=https://github.com/open-telemetry/opentelemetry-operator>operator</a>, which enables several <code>CustomResourceDefinitions</code>. The one we are mainly interested is <code>OpenTelemetryCollector</code>. If you <code>$ kubectl explain opentelemetrycollector --recursive</code>, it can be a bit scary of how many settings there are. But we&rsquo;ll approach the most relevant ones in this article.</p><h1 id=telemetry-pipelines>Telemetry pipelines</h1><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>receivers</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>hostmetrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>hostmetrics/disk</span><span class=w> </span><span class=c># Get host metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>kubeletstats</span><span class=w> </span><span class=c># Get Kubernetes metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>spanmetrics</span><span class=w> </span><span class=c># Get parsed metrics from Traces</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>prometheus</span><span class=w> </span><span class=c># Get scraped metrics from the Cluster&#39;s service monitors</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>memory_limiter</span><span class=w> </span><span class=c># Keep things cool</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>resource/instance</span><span class=w> </span><span class=c># Set &#34;instance&#34; label so we know, in which machine, the daemonset pod has processed the telemetry</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>k8sattributes</span><span class=w> </span><span class=c># Label metrics with infos from the Kubernetes workload</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>transform/metrics</span><span class=w> </span><span class=c># Sanitize non-needed labels</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>batch</span><span class=w> </span><span class=c># Batch stuff so we don&#39;t DDoS the timeseries backend</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>exporters</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>prometheusremotewrite</span><span class=w> </span><span class=c># Write to the telemetry backend</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>logs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>receivers</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>filelog</span><span class=w> </span><span class=c># Tail container log files in the host</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>otlp</span><span class=w> </span><span class=c># Possibly receive other logs from apps&#39;s OpenTelemetry instrumentation</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>memory_limiter</span><span class=w> </span><span class=c># Keep things cool</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>transform/logs</span><span class=w> </span><span class=c># Drop unwanted fields</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>batch</span><span class=w> </span><span class=c># Don&#39;t DDoS the log storage backend</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>exporters</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>otlphttp/victoriametrics</span><span class=w> </span><span class=c># Write to the log backend</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>traces</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>receivers</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>otlp</span><span class=w> </span><span class=c># Receive traces from apps&#39; instrumentation</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>processors</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>memory_limiter</span><span class=w> </span><span class=c># Keep things cool</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>k8sattributes</span><span class=w> </span><span class=c># Enrich trace metadata</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>resource/instance</span><span class=w> </span><span class=c># Say which node has processed the span</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>transform/spanmetrics</span><span class=w> </span><span class=c># Parse spans to metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>batch</span><span class=w> </span><span class=c># Don&#39;t DDoS the trace storage backend</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>exporters</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>spanmetrics</span><span class=w> </span><span class=c># Send newly-parsed metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=l>loadbalancing</span><span class=w> </span><span class=c># Send spans to trace-collector for gathering cross-node spans</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>OpenTelemetry Collector has the features to make it happen. In fact, these above are pieces to achieve such telemetry flow.</p><h1 id=metrics>Metrics</h1><p>These come from four different sources</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver>hostmetrics</a> receiver<ul><li>Scrape the machine metrics like cpu, memory, filesystem, network, etc</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver>kubeletstats</a> receiver<ul><li>Scrape Kubernetes metrics from cAdvisor, i.e. nodes, containers, etc</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/spanmetricsconnector>spanmetrics</a> connector<ul><li>Receives metrics parsed from traces, e.g. <code>calls_total</code>, <code>duration_milliseconds_.*</code></li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver#opentelemetry-operator>Prometheus</a> receiver<ul><li>Relies on <a href=https://opentelemetry.io/docs/platforms/kubernetes/operator/target-allocator/>target allocator</a> to find <a href=https://prometheus-operator.dev/docs/developer/getting-started/#using-servicemonitors>service monitors</a> to scrape</li></ul></li></ul><p>Are processed with</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor>memory_limiter</a> processor<ul><li>Ensures the collector doesn&rsquo;t trespass the max limit and crash; at the expense of losing data</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor>resource</a> processor<ul><li>Label the metric arbitrarily</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor>k8sattributes</a> processor<ul><li>Label the metric from Kubernetes resource label</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor>transform</a> processor<ul><li>Add and remove metric labels aiming to keep cardinality lower as possible</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor>batch</a> processor<ul><li>Suggestively, gathers metrics before sending them to save some network calls</li></ul></li></ul><p>And forwarded to</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/prometheusremotewriteexporter>prometheusremotewrite</a> exporter<ul><li>Sends metrics to Victoriametrics&rsquo; <code>insert</code> workload<ul><li>In my cluster, the <code>prometheusremotewrite</code> was noticeably much more memory friendly than <code>otlphttp</code></li></ul></li></ul></li></ul><h1 id=logs>Logs</h1><p>These can come from two origins</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver>filelog</a> receiver<ul><li>Tails pod log files logs (assuming containerd as the CRI), parses them to json when applicable, and extract resource metadata out of it</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver>otlp</a> receiver<ul><li>To enable apps sending arbitrary logs not written in stdout/stderr</li></ul></li></ul><p>Are processed with</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor>memory_limiter</a> processor<ul><li>Ensures the collector doesn&rsquo;t trespass the max limit and crash; at the expense of losing data</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor>transform</a> processor<ul><li>Aiming to keep storage lower as possible, drops everything we don&rsquo;t need as a filterable field</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor>batch</a> processor</li></ul><p>And forwarded to</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter>otlphttp</a> exporter<ul><li>Sends to Victorialogs <code>insert</code> workload</li></ul></li></ul><h1 id=traces>Traces</h1><p>These can come from a single origin</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver>otlp</a> receiver<ul><li>App instrumentation reports traces via <code>otlp</code> to their node&rsquo;s Collector, on the <code>hostPort</code> opened by the DaemonSet</li></ul></li></ul><p>Are processed with</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor>memory_limiter</a> processor</li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor>k8sattributes</a> processor</li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor>resource</a> processor</li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor>transform</a> processor</li><li><a href=https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor>batch</a> processor</li></ul><p>And forwarded to</p><ul><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/spanmetricsconnector>spanmetrics</a> connector<ul><li>Which is also one of the metrics&rsquo; pipeline receiver</li></ul></li><li><a href=https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter>loadbalancing</a> exporter<ul><li>Routes spans by <code>traceID</code>, so all spans are gathered in the same <code>trace-collector</code>, which is necessary for tail sampling</li></ul></li></ul><h1 id=appendix-full-manifests>Appendix: Full manifests</h1><h2 id=otel-collector-daemonset>otel-collector DaemonSet</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>  1
+</span><span class=lnt>  2
+</span><span class=lnt>  3
+</span><span class=lnt>  4
+</span><span class=lnt>  5
+</span><span class=lnt>  6
+</span><span class=lnt>  7
+</span><span class=lnt>  8
+</span><span class=lnt>  9
+</span><span class=lnt> 10
+</span><span class=lnt> 11
+</span><span class=lnt> 12
+</span><span class=lnt> 13
+</span><span class=lnt> 14
+</span><span class=lnt> 15
+</span><span class=lnt> 16
+</span><span class=lnt> 17
+</span><span class=lnt> 18
+</span><span class=lnt> 19
+</span><span class=lnt> 20
+</span><span class=lnt> 21
+</span><span class=lnt> 22
+</span><span class=lnt> 23
+</span><span class=lnt> 24
+</span><span class=lnt> 25
+</span><span class=lnt> 26
+</span><span class=lnt> 27
+</span><span class=lnt> 28
+</span><span class=lnt> 29
+</span><span class=lnt> 30
+</span><span class=lnt> 31
+</span><span class=lnt> 32
+</span><span class=lnt> 33
+</span><span class=lnt> 34
+</span><span class=lnt> 35
+</span><span class=lnt> 36
+</span><span class=lnt> 37
+</span><span class=lnt> 38
+</span><span class=lnt> 39
+</span><span class=lnt> 40
+</span><span class=lnt> 41
+</span><span class=lnt> 42
+</span><span class=lnt> 43
+</span><span class=lnt> 44
+</span><span class=lnt> 45
+</span><span class=lnt> 46
+</span><span class=lnt> 47
+</span><span class=lnt> 48
+</span><span class=lnt> 49
+</span><span class=lnt> 50
+</span><span class=lnt> 51
+</span><span class=lnt> 52
+</span><span class=lnt> 53
+</span><span class=lnt> 54
+</span><span class=lnt> 55
+</span><span class=lnt> 56
+</span><span class=lnt> 57
+</span><span class=lnt> 58
+</span><span class=lnt> 59
+</span><span class=lnt> 60
+</span><span class=lnt> 61
+</span><span class=lnt> 62
+</span><span class=lnt> 63
+</span><span class=lnt> 64
+</span><span class=lnt> 65
+</span><span class=lnt> 66
+</span><span class=lnt> 67
+</span><span class=lnt> 68
+</span><span class=lnt> 69
+</span><span class=lnt> 70
+</span><span class=lnt> 71
+</span><span class=lnt> 72
+</span><span class=lnt> 73
+</span><span class=lnt> 74
+</span><span class=lnt> 75
+</span><span class=lnt> 76
+</span><span class=lnt> 77
+</span><span class=lnt> 78
+</span><span class=lnt> 79
+</span><span class=lnt> 80
+</span><span class=lnt> 81
+</span><span class=lnt> 82
+</span><span class=lnt> 83
+</span><span class=lnt> 84
+</span><span class=lnt> 85
+</span><span class=lnt> 86
+</span><span class=lnt> 87
+</span><span class=lnt> 88
+</span><span class=lnt> 89
+</span><span class=lnt> 90
+</span><span class=lnt> 91
+</span><span class=lnt> 92
+</span><span class=lnt> 93
+</span><span class=lnt> 94
+</span><span class=lnt> 95
+</span><span class=lnt> 96
+</span><span class=lnt> 97
+</span><span class=lnt> 98
+</span><span class=lnt> 99
+</span><span class=lnt>100
+</span><span class=lnt>101
+</span><span class=lnt>102
+</span><span class=lnt>103
+</span><span class=lnt>104
+</span><span class=lnt>105
+</span><span class=lnt>106
+</span><span class=lnt>107
+</span><span class=lnt>108
+</span><span class=lnt>109
+</span><span class=lnt>110
+</span><span class=lnt>111
+</span><span class=lnt>112
+</span><span class=lnt>113
+</span><span class=lnt>114
+</span><span class=lnt>115
+</span><span class=lnt>116
+</span><span class=lnt>117
+</span><span class=lnt>118
+</span><span class=lnt>119
+</span><span class=lnt>120
+</span><span class=lnt>121
+</span><span class=lnt>122
+</span><span class=lnt>123
+</span><span class=lnt>124
+</span><span class=lnt>125
+</span><span class=lnt>126
+</span><span class=lnt>127
+</span><span class=lnt>128
+</span><span class=lnt>129
+</span><span class=lnt>130
+</span><span class=lnt>131
+</span><span class=lnt>132
+</span><span class=lnt>133
+</span><span class=lnt>134
+</span><span class=lnt>135
+</span><span class=lnt>136
+</span><span class=lnt>137
+</span><span class=lnt>138
+</span><span class=lnt>139
+</span><span class=lnt>140
+</span><span class=lnt>141
+</span><span class=lnt>142
+</span><span class=lnt>143
+</span><span class=lnt>144
+</span><span class=lnt>145
+</span><span class=lnt>146
+</span><span class=lnt>147
+</span><span class=lnt>148
+</span><span class=lnt>149
+</span><span class=lnt>150
+</span><span class=lnt>151
+</span><span class=lnt>152
+</span><span class=lnt>153
+</span><span class=lnt>154
+</span><span class=lnt>155
+</span><span class=lnt>156
+</span><span class=lnt>157
+</span><span class=lnt>158
+</span><span class=lnt>159
+</span><span class=lnt>160
+</span><span class=lnt>161
+</span><span class=lnt>162
+</span><span class=lnt>163
+</span><span class=lnt>164
+</span><span class=lnt>165
+</span><span class=lnt>166
+</span><span class=lnt>167
+</span><span class=lnt>168
+</span><span class=lnt>169
+</span><span class=lnt>170
+</span><span class=lnt>171
+</span><span class=lnt>172
+</span><span class=lnt>173
+</span><span class=lnt>174
+</span><span class=lnt>175
+</span><span class=lnt>176
+</span><span class=lnt>177
+</span><span class=lnt>178
+</span><span class=lnt>179
+</span><span class=lnt>180
+</span><span class=lnt>181
+</span><span class=lnt>182
+</span><span class=lnt>183
+</span><span class=lnt>184
+</span><span class=lnt>185
+</span><span class=lnt>186
+</span><span class=lnt>187
+</span><span class=lnt>188
+</span><span class=lnt>189
+</span><span class=lnt>190
+</span><span class=lnt>191
+</span><span class=lnt>192
+</span><span class=lnt>193
+</span><span class=lnt>194
+</span><span class=lnt>195
+</span><span class=lnt>196
+</span><span class=lnt>197
+</span><span class=lnt>198
+</span><span class=lnt>199
+</span><span class=lnt>200
+</span><span class=lnt>201
+</span><span class=lnt>202
+</span><span class=lnt>203
+</span><span class=lnt>204
+</span><span class=lnt>205
+</span><span class=lnt>206
+</span><span class=lnt>207
+</span><span class=lnt>208
+</span><span class=lnt>209
+</span><span class=lnt>210
+</span><span class=lnt>211
+</span><span class=lnt>212
+</span><span class=lnt>213
+</span><span class=lnt>214
+</span><span class=lnt>215
+</span><span class=lnt>216
+</span><span class=lnt>217
+</span><span class=lnt>218
+</span><span class=lnt>219
+</span><span class=lnt>220
+</span><span class=lnt>221
+</span><span class=lnt>222
+</span><span class=lnt>223
+</span><span class=lnt>224
+</span><span class=lnt>225
+</span><span class=lnt>226
+</span><span class=lnt>227
+</span><span class=lnt>228
+</span><span class=lnt>229
+</span><span class=lnt>230
+</span><span class=lnt>231
+</span><span class=lnt>232
+</span><span class=lnt>233
+</span><span class=lnt>234
+</span><span class=lnt>235
+</span><span class=lnt>236
+</span><span class=lnt>237
+</span><span class=lnt>238
+</span><span class=lnt>239
+</span><span class=lnt>240
+</span><span class=lnt>241
+</span><span class=lnt>242
+</span><span class=lnt>243
+</span><span class=lnt>244
+</span><span class=lnt>245
+</span><span class=lnt>246
+</span><span class=lnt>247
+</span><span class=lnt>248
+</span><span class=lnt>249
+</span><span class=lnt>250
+</span><span class=lnt>251
+</span><span class=lnt>252
+</span><span class=lnt>253
+</span><span class=lnt>254
+</span><span class=lnt>255
+</span><span class=lnt>256
+</span><span class=lnt>257
+</span><span class=lnt>258
+</span><span class=lnt>259
+</span><span class=lnt>260
+</span><span class=lnt>261
+</span><span class=lnt>262
+</span><span class=lnt>263
+</span><span class=lnt>264
+</span><span class=lnt>265
+</span><span class=lnt>266
+</span><span class=lnt>267
+</span><span class=lnt>268
+</span><span class=lnt>269
+</span><span class=lnt>270
+</span><span class=lnt>271
+</span><span class=lnt>272
+</span><span class=lnt>273
+</span><span class=lnt>274
+</span><span class=lnt>275
+</span><span class=lnt>276
+</span><span class=lnt>277
+</span><span class=lnt>278
+</span><span class=lnt>279
+</span><span class=lnt>280
+</span><span class=lnt>281
+</span><span class=lnt>282
+</span><span class=lnt>283
+</span><span class=lnt>284
+</span><span class=lnt>285
+</span><span class=lnt>286
+</span><span class=lnt>287
+</span><span class=lnt>288
+</span><span class=lnt>289
+</span><span class=lnt>290
+</span><span class=lnt>291
+</span><span class=lnt>292
+</span><span class=lnt>293
+</span><span class=lnt>294
+</span><span class=lnt>295
+</span><span class=lnt>296
+</span><span class=lnt>297
+</span><span class=lnt>298
+</span><span class=lnt>299
+</span><span class=lnt>300
+</span><span class=lnt>301
+</span><span class=lnt>302
+</span><span class=lnt>303
+</span><span class=lnt>304
+</span><span class=lnt>305
+</span><span class=lnt>306
+</span><span class=lnt>307
+</span><span class=lnt>308
+</span><span class=lnt>309
+</span><span class=lnt>310
+</span><span class=lnt>311
+</span><span class=lnt>312
+</span><span class=lnt>313
+</span><span class=lnt>314
+</span><span class=lnt>315
+</span><span class=lnt>316
+</span><span class=lnt>317
+</span><span class=lnt>318
+</span><span class=lnt>319
+</span><span class=lnt>320
+</span><span class=lnt>321
+</span><span class=lnt>322
+</span><span class=lnt>323
+</span><span class=lnt>324
+</span><span class=lnt>325
+</span><span class=lnt>326
+</span><span class=lnt>327
+</span><span class=lnt>328
+</span><span class=lnt>329
+</span><span class=lnt>330
+</span><span class=lnt>331
+</span><span class=lnt>332
+</span><span class=lnt>333
+</span><span class=lnt>334
+</span><span class=lnt>335
+</span><span class=lnt>336
+</span><span class=lnt>337
+</span><span class=lnt>338
+</span><span class=lnt>339
+</span><span class=lnt>340
+</span><span class=lnt>341
+</span><span class=lnt>342
+</span><span class=lnt>343
+</span><span class=lnt>344
+</span><span class=lnt>345
+</span><span class=lnt>346
+</span><span class=lnt>347
+</span><span class=lnt>348
+</span><span class=lnt>349
+</span><span class=lnt>350
+</span><span class=lnt>351
+</span><span class=lnt>352
+</span><span class=lnt>353
+</span><span class=lnt>354
+</span><span class=lnt>355
+</span><span class=lnt>356
+</span><span class=lnt>357
+</span><span class=lnt>358
+</span><span class=lnt>359
+</span><span class=lnt>360
+</span><span class=lnt>361
+</span><span class=lnt>362
+</span><span class=lnt>363
+</span><span class=lnt>364
+</span><span class=lnt>365
+</span><span class=lnt>366
+</span><span class=lnt>367
+</span><span class=lnt>368
+</span><span class=lnt>369
+</span><span class=lnt>370
+</span><span class=lnt>371
+</span><span class=lnt>372
+</span><span class=lnt>373
+</span><span class=lnt>374
+</span><span class=lnt>375
+</span><span class=lnt>376
+</span><span class=lnt>377
+</span><span class=lnt>378
+</span><span class=lnt>379
+</span><span class=lnt>380
+</span><span class=lnt>381
+</span><span class=lnt>382
+</span><span class=lnt>383
+</span><span class=lnt>384
+</span><span class=lnt>385
+</span><span class=lnt>386
+</span><span class=lnt>387
+</span><span class=lnt>388
+</span><span class=lnt>389
+</span><span class=lnt>390
+</span><span class=lnt>391
+</span><span class=lnt>392
+</span><span class=lnt>393
+</span><span class=lnt>394
+</span><span class=lnt>395
+</span><span class=lnt>396
+</span><span class=lnt>397
+</span><span class=lnt>398
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>opentelemetry.io/v1beta1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>OpenTelemetryCollector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>spec</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>mode</span><span class=p>:</span><span class=w> </span><span class=l>daemonset</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>image</span><span class=p>:</span><span class=w> </span><span class=l>ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.140.1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>requests</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>cpu</span><span class=p>:</span><span class=w> </span><span class=l>100m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>memory</span><span class=p>:</span><span class=w> </span><span class=l>448Mi</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>limits</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>cpu</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;2&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>memory</span><span class=p>:</span><span class=w> </span><span class=l>1536Mi</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>ports</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>grpc</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>port</span><span class=p>:</span><span class=w> </span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>hostPort</span><span class=p>:</span><span class=w> </span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>targetPort</span><span class=p>:</span><span class=w> </span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>http</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>port</span><span class=p>:</span><span class=w> </span><span class=m>4318</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>hostPort</span><span class=p>:</span><span class=w> </span><span class=m>4318</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>targetPort</span><span class=p>:</span><span class=w> </span><span class=m>4318</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>observability</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>enableMetrics</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>env</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>POD_IP</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>valueFrom</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>fieldRef</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>fieldPath</span><span class=p>:</span><span class=w> </span><span class=l>status.podIP</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>K8S_NODE_NAME</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>valueFrom</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>fieldRef</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>fieldPath</span><span class=p>:</span><span class=w> </span><span class=l>spec.nodeName</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>targetAllocator</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>image</span><span class=p>:</span><span class=w> </span><span class=l>ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.138.0</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>requests</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>cpu</span><span class=p>:</span><span class=w> </span><span class=l>25m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>memory</span><span class=p>:</span><span class=w> </span><span class=l>128Mi</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>limits</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>cpu</span><span class=p>:</span><span class=w> </span><span class=l>250m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>memory</span><span class=p>:</span><span class=w> </span><span class=l>256Mi</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>allocationStrategy</span><span class=p>:</span><span class=w> </span><span class=l>per-node</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>prometheusCR</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>scrapeInterval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>serviceMonitorSelector</span><span class=p>:</span><span class=w> </span>{}<span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>volumes</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>varlogpods</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>hostPath</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>path</span><span class=p>:</span><span class=w> </span><span class=l>/var/log/pods</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>volumeMounts</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>varlogpods</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>mountPath</span><span class=p>:</span><span class=w> </span><span class=l>/var/log/pods</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>config</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>extensions</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>health_check</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=l>${env:POD_IP}:13133</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c># https://opentelemetry.io/docs/collector/components/receiver/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>receivers</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>otlp</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>protocols</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>grpc</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=m>0.0.0.0</span><span class=p>:</span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>http</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=m>0.0.0.0</span><span class=p>:</span><span class=m>4318</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>filelog</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>include</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=l>/var/log/pods/*/*/*.log</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>include_file_name</span><span class=p>:</span><span class=w> </span><span class=kc>false</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>include_file_path</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>retry_on_failure</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>start_at</span><span class=p>:</span><span class=w> </span><span class=l>beginning</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>operators</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>id</span><span class=p>:</span><span class=w> </span><span class=l>parser-containerd</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>regex_parser </span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>regex</span><span class=p>:</span><span class=w> </span><span class=l>^(?P&lt;time&gt;[^ ^Z]+Z) (?P&lt;stream&gt;stdout|stderr) (?P&lt;logtag&gt;[^ ]*) ?(?P&lt;log&gt;.*)$</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>timestamp</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>layout</span><span class=p>:</span><span class=w> </span><span class=s1>&#39;%Y-%m-%dT%H:%M:%S.%LZ&#39;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>parse_from</span><span class=p>:</span><span class=w> </span><span class=l>attributes.time</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>id</span><span class=p>:</span><span class=w> </span><span class=l>parser-pod-info</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>parse_from</span><span class=p>:</span><span class=w> </span><span class=l>attributes[&#34;log.file.path&#34;]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>regex</span><span class=p>:</span><span class=w> </span><span class=l>^.*\/(?P&lt;namespace&gt;[^_]+)_(?P&lt;pod_name&gt;[^_]+)_(?P&lt;uid&gt;[a-f0-9\-]+)\/(?P&lt;container_name&gt;[^\._]+)\/(?P&lt;restart_count&gt;\d+)\.log$</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>regex_parser</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=c># Handle line breaks</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>recombine</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>is_last_entry</span><span class=p>:</span><span class=w> </span><span class=l>attributes.logtag == &#39;F&#39;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>combine_field</span><span class=p>:</span><span class=w> </span><span class=l>attributes.log</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>combine_with</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>max_batch_size</span><span class=p>:</span><span class=w> </span><span class=m>1000</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>max_log_size</span><span class=p>:</span><span class=w> </span><span class=m>1048576</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>output</span><span class=p>:</span><span class=w> </span><span class=l>handle_empty_log</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>source_identifier</span><span class=p>:</span><span class=w> </span><span class=l>attributes[&#34;log.file.path&#34;]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>field</span><span class=p>:</span><span class=w> </span><span class=l>attributes.log</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>id</span><span class=p>:</span><span class=w> </span><span class=l>handle_empty_log</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>if</span><span class=p>:</span><span class=w> </span><span class=l>attributes.log == nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>add</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>value</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>json_parser</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>parse_from</span><span class=p>:</span><span class=w> </span><span class=l>attributes.log</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>if</span><span class=p>:</span><span class=w> </span><span class=l>attributes.log matches &#34;^\\{&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>add</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>field</span><span class=p>:</span><span class=w> </span><span class=l>attributes.instance</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>value</span><span class=p>:</span><span class=w> </span><span class=l>${env:K8S_NODE_NAME}</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>id</span><span class=p>:</span><span class=w> </span><span class=l>export</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>noop</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>hostmetrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>collection_interval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>root_path</span><span class=p>:</span><span class=w> </span><span class=l>/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>scrapers</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>cpu</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>enabled</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.cpu.time</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.cpu.utilization</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.cpu.physical.count</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>memory</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.memory.usage</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.memory.utilization</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.memory.limit</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>load</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>cpu_average</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.cpu.load_average.1m</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.cpu.load_average.5m</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.cpu.load_average.15m</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>network</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.connections</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.dropped</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.errors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.io</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.packets</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.conntrack.count</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.network.conntrack.max</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>hostmetrics/disk</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>collection_interval</span><span class=p>:</span><span class=w> </span><span class=l>1m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>root_path</span><span class=p>:</span><span class=w> </span><span class=l>/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>scrapers</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>disk</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.disk.io</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.disk.operations</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>filesystem</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.filesystem.usage</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>system.filesystem.utilization</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>kubeletstats</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>collection_interval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>auth_type</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;serviceAccount&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;https://${env:K8S_NODE_NAME}:10250&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>insecure_skip_verify</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>collect_all_network_interfaces</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>node</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>pod</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>prometheus</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>target_allocator</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>collector_id</span><span class=p>:</span><span class=w> </span><span class=l>${env:POD_NAME}</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=l>http://otel-targetallocator</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>interval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>config</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>scrape_configs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>job_name</span><span class=p>:</span><span class=w> </span><span class=l>otel-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>scrape_interval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>static_configs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span>- <span class=nt>targets</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                  </span>- <span class=l>${env:POD_IP}:8888</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c># https://opentelemetry.io/docs/collector/components/processor/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>memory_limiter</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>check_interval</span><span class=p>:</span><span class=w> </span><span class=l>1s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>limit_percentage</span><span class=p>:</span><span class=w> </span><span class=m>75</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>spike_limit_percentage</span><span class=p>:</span><span class=w> </span><span class=m>15</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>batch</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>send_batch_max_size</span><span class=p>:</span><span class=w> </span><span class=m>2048</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>send_batch_size</span><span class=p>:</span><span class=w> </span><span class=m>1024</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>timeout</span><span class=p>:</span><span class=w> </span><span class=l>1s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>k8sattributes</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>auth_type</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;serviceAccount&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>passthrough</span><span class=p>:</span><span class=w> </span><span class=kc>false</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>filter</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>node_from_env_var</span><span class=p>:</span><span class=w> </span><span class=l>K8S_NODE_NAME</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>extract</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.namespace.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.deployment.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.replicaset.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.statefulset.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.daemonset.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.cronjob.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.job.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.node.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.pod.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.pod.ip</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8s.container.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>container.id</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>labels</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>tag_name</span><span class=p>:</span><span class=w> </span><span class=l>owner</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>key</span><span class=p>:</span><span class=w> </span><span class=l>app.kubernetes.io/owner</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>from</span><span class=p>:</span><span class=w> </span><span class=l>pod</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>pod_association</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>sources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>from</span><span class=p>:</span><span class=w> </span><span class=l>resource_attribute</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>k8s.pod.ip</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>sources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>from</span><span class=p>:</span><span class=w> </span><span class=l>resource_attribute</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>k8s.pod.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>from</span><span class=p>:</span><span class=w> </span><span class=l>resource_attribute</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>k8s.namespace.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>sources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>from</span><span class=p>:</span><span class=w> </span><span class=l>connection</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>resource/instance</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>attributes</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=c># Sets &#34;instance&#34; label on metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>action</span><span class=p>:</span><span class=w> </span><span class=l>upsert</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>key</span><span class=p>:</span><span class=w> </span><span class=l>service.instance.id</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>value</span><span class=p>:</span><span class=w> </span><span class=l>${env:K8S_NODE_NAME}</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>transform/logs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>error_mode</span><span class=p>:</span><span class=w> </span><span class=l>ignore</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>log_statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=c># Keep only essential fields</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(log.attributes[&#34;namespace&#34;], resource.attributes[&#34;namespace&#34;])</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>keep_matching_keys(log.attributes, &#34;^(_.*|@.*|filename|log|service|job|agent|k8s\\.|container_name|instance|level|msg|message|namespace|pod_name|severity|severity_text|stream)&#34;)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>conditions</span><span class=p>:</span><span class=w> </span><span class=l>IsMap(log.body)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span>- <span class=l>keep_matching_keys(log.body, &#34;^(level|msg|message|severity|severity_text)$&#34;)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>transform/metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>error_mode</span><span class=p>:</span><span class=w> </span><span class=l>ignore</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>metric_statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;env&#34;], resource.attributes[&#34;k8s.cluster.name&#34;])</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;owner&#34;], resource.attributes[&#34;owner&#34;]) where resource.attributes[&#34;owner&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;namespace&#34;], resource.attributes[&#34;k8s.namespace.name&#34;]) where resource.attributes[&#34;k8s.namespace.name&#34;] != nil and resource.attributes[&#34;k8s.namespace.name&#34;] != &#34;kube-system&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;pod&#34;], resource.attributes[&#34;k8s.pod.name&#34;]) where resource.attributes[&#34;k8s.pod.name&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;container&#34;], resource.attributes[&#34;k8s.container.name&#34;]) where resource.attributes[&#34;k8s.container.name&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=c># Normalize label names for kube-state-metrics, ingress-nginx, etc.</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;namespace&#34;], datapoint.attributes[&#34;exported_namespace&#34;]) where datapoint.attributes[&#34;exported_namespace&#34;] != nil and resource.attributes[&#34;k8s.namespace.name&#34;] != &#34;kube-system&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;service&#34;], datapoint.attributes[&#34;exported_service&#34;]) where datapoint.attributes[&#34;exported_service&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;pod&#34;], datapoint.attributes[&#34;exported_pod&#34;]) where datapoint.attributes[&#34;exported_pod&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(datapoint.attributes[&#34;container&#34;], datapoint.attributes[&#34;exported_container&#34;]) where datapoint.attributes[&#34;exported_container&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>delete_key(datapoint.attributes, &#34;exported_namespace&#34;) where datapoint.attributes[&#34;exported_namespace&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>delete_key(datapoint.attributes, &#34;exported_service&#34;) where datapoint.attributes[&#34;exported_service&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>delete_key(datapoint.attributes, &#34;exported_pod&#34;) where datapoint.attributes[&#34;exported_pod&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>delete_key(datapoint.attributes, &#34;exported_container&#34;) where datapoint.attributes[&#34;exported_container&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>transform/spanmetrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>error_mode</span><span class=p>:</span><span class=w> </span><span class=l>silent</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>trace_statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=nt>statements</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(span.attributes[&#34;namespace&#34;], resource.attributes[&#34;k8s.namespace.name&#34;]) where resource.attributes[&#34;k8s.namespace.name&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>set(span.attributes[&#34;namespace&#34;], resource.attributes[&#34;service.namespace&#34;]) where resource.attributes[&#34;service.namespace&#34;] != nil</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>connectors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>spanmetrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>aggregation_cardinality_limit</span><span class=p>:</span><span class=w> </span><span class=m>100000</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>dimensions</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>namespace</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>http.route</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>http.method</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>http.status_code</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>exclude_dimensions</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>status.code</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>span.name</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>span.kind</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>service.name</span><span class=w> </span><span class=c># The &#34;job&#34; label usually carries the same value</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>histogram</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>explicit</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>buckets</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>10ms</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>50ms</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>100ms</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>250ms</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>500ms</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>1s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>2s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>5s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>metrics_expiration</span><span class=p>:</span><span class=w> </span><span class=l>1m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>metrics_flush_interval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>namespace</span><span class=p>:</span><span class=w> </span><span class=s2>&#34;&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c># https://opentelemetry.io/docs/collector/components/exporter/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>exporters</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>debug</span><span class=p>:</span><span class=w> </span>{}<span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>prometheusremotewrite</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=l>http://vmmetrics-insert.victoriametrics:8480/insert/0/prometheus</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>timeout</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>retry_on_failure</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>enabled</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>initial_interval</span><span class=p>:</span><span class=w> </span><span class=l>10s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>max_interval</span><span class=p>:</span><span class=w> </span><span class=l>60s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>max_elapsed_time</span><span class=p>:</span><span class=w> </span><span class=l>300s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>otlphttp/victoriametrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>compression</span><span class=p>:</span><span class=w> </span><span class=l>gzip</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>encoding</span><span class=p>:</span><span class=w> </span><span class=l>proto</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>logs_endpoint</span><span class=p>:</span><span class=w> </span><span class=l>http://vmlogs-insert.victoriametrics:9481/insert/opentelemetry/v1/logs</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>tls</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>insecure</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>loadbalancing</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>routing_key</span><span class=p>:</span><span class=w> </span><span class=l>traceID</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>resolver</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>dns</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>hostname</span><span class=p>:</span><span class=w> </span><span class=l>trace-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>protocol</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>otlp</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>tls</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>insecure</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c># https://opentelemetry.io/docs/collector/configuration/#service</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>service</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>telemetry</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>logs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>encoding</span><span class=p>:</span><span class=w> </span><span class=l>json</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>level</span><span class=p>:</span><span class=w> </span><span class=l>info</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>extensions</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span>- <span class=l>health_check</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=c># https://opentelemetry.io/docs/collector/configuration/#pipelines</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>pipelines</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>logs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>receivers</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>filelog, otlp]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>memory_limiter</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>transform/logs</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>batch</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>exporters</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>otlphttp/victoriametrics]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>receivers</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>hostmetrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>hostmetrics/disk</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>kubeletstats</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>spanmetrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>prometheus</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>memory_limiter</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>resource/instance</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8sattributes</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>transform/metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>batch</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>exporters</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>prometheusremotewrite</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>traces</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>receivers</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>otlp]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>processors</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>memory_limiter</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>k8sattributes</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>resource/instance</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>transform/spanmetrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>batch</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>exporters</span><span class=p>:</span><span class=w> 
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>spanmetrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=l>loadbalancing</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><h2 id=otel-collector-rbac>otel-collector RBAC</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>rbac.authorization.k8s.io/v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ClusterRole</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>rules</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>pods</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>namespaces</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>nodes</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>nodes/metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>nodes/stats</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;apps&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>replicasets</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>deployments</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>statefulsets</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>daemonsets</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;batch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>jobs</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>cronjobs</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;extensions&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>replicasets</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nn>---</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>rbac.authorization.k8s.io/v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ClusterRoleBinding</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>roleRef</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>apiGroup</span><span class=p>:</span><span class=w> </span><span class=l>rbac.authorization.k8s.io</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ClusterRole</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>subjects</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ServiceAccount</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-collector</span><span class=w> </span><span class=c># Controller provisions the SA but not the ClusterRole</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>namespace</span><span class=p>:</span><span class=w> </span><span class=l>open-telemetry</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><h2 id=trace-collector-deployment>trace-collector Deployment</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>  1
+</span><span class=lnt>  2
+</span><span class=lnt>  3
+</span><span class=lnt>  4
+</span><span class=lnt>  5
+</span><span class=lnt>  6
+</span><span class=lnt>  7
+</span><span class=lnt>  8
+</span><span class=lnt>  9
+</span><span class=lnt> 10
+</span><span class=lnt> 11
+</span><span class=lnt> 12
+</span><span class=lnt> 13
+</span><span class=lnt> 14
+</span><span class=lnt> 15
+</span><span class=lnt> 16
+</span><span class=lnt> 17
+</span><span class=lnt> 18
+</span><span class=lnt> 19
+</span><span class=lnt> 20
+</span><span class=lnt> 21
+</span><span class=lnt> 22
+</span><span class=lnt> 23
+</span><span class=lnt> 24
+</span><span class=lnt> 25
+</span><span class=lnt> 26
+</span><span class=lnt> 27
+</span><span class=lnt> 28
+</span><span class=lnt> 29
+</span><span class=lnt> 30
+</span><span class=lnt> 31
+</span><span class=lnt> 32
+</span><span class=lnt> 33
+</span><span class=lnt> 34
+</span><span class=lnt> 35
+</span><span class=lnt> 36
+</span><span class=lnt> 37
+</span><span class=lnt> 38
+</span><span class=lnt> 39
+</span><span class=lnt> 40
+</span><span class=lnt> 41
+</span><span class=lnt> 42
+</span><span class=lnt> 43
+</span><span class=lnt> 44
+</span><span class=lnt> 45
+</span><span class=lnt> 46
+</span><span class=lnt> 47
+</span><span class=lnt> 48
+</span><span class=lnt> 49
+</span><span class=lnt> 50
+</span><span class=lnt> 51
+</span><span class=lnt> 52
+</span><span class=lnt> 53
+</span><span class=lnt> 54
+</span><span class=lnt> 55
+</span><span class=lnt> 56
+</span><span class=lnt> 57
+</span><span class=lnt> 58
+</span><span class=lnt> 59
+</span><span class=lnt> 60
+</span><span class=lnt> 61
+</span><span class=lnt> 62
+</span><span class=lnt> 63
+</span><span class=lnt> 64
+</span><span class=lnt> 65
+</span><span class=lnt> 66
+</span><span class=lnt> 67
+</span><span class=lnt> 68
+</span><span class=lnt> 69
+</span><span class=lnt> 70
+</span><span class=lnt> 71
+</span><span class=lnt> 72
+</span><span class=lnt> 73
+</span><span class=lnt> 74
+</span><span class=lnt> 75
+</span><span class=lnt> 76
+</span><span class=lnt> 77
+</span><span class=lnt> 78
+</span><span class=lnt> 79
+</span><span class=lnt> 80
+</span><span class=lnt> 81
+</span><span class=lnt> 82
+</span><span class=lnt> 83
+</span><span class=lnt> 84
+</span><span class=lnt> 85
+</span><span class=lnt> 86
+</span><span class=lnt> 87
+</span><span class=lnt> 88
+</span><span class=lnt> 89
+</span><span class=lnt> 90
+</span><span class=lnt> 91
+</span><span class=lnt> 92
+</span><span class=lnt> 93
+</span><span class=lnt> 94
+</span><span class=lnt> 95
+</span><span class=lnt> 96
+</span><span class=lnt> 97
+</span><span class=lnt> 98
+</span><span class=lnt> 99
+</span><span class=lnt>100
+</span><span class=lnt>101
+</span><span class=lnt>102
+</span><span class=lnt>103
+</span><span class=lnt>104
+</span><span class=lnt>105
+</span><span class=lnt>106
+</span><span class=lnt>107
+</span><span class=lnt>108
+</span><span class=lnt>109
+</span><span class=lnt>110
+</span><span class=lnt>111
+</span><span class=lnt>112
+</span><span class=lnt>113
+</span><span class=lnt>114
+</span><span class=lnt>115
+</span><span class=lnt>116
+</span><span class=lnt>117
+</span><span class=lnt>118
+</span><span class=lnt>119
+</span><span class=lnt>120
+</span><span class=lnt>121
+</span><span class=lnt>122
+</span><span class=lnt>123
+</span><span class=lnt>124
+</span><span class=lnt>125
+</span><span class=lnt>126
+</span><span class=lnt>127
+</span><span class=lnt>128
+</span><span class=lnt>129
+</span><span class=lnt>130
+</span><span class=lnt>131
+</span><span class=lnt>132
+</span><span class=lnt>133
+</span><span class=lnt>134
+</span><span class=lnt>135
+</span><span class=lnt>136
+</span><span class=lnt>137
+</span><span class=lnt>138
+</span><span class=lnt>139
+</span><span class=lnt>140
+</span><span class=lnt>141
+</span><span class=lnt>142
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=c># trace-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>opentelemetry.io/v1beta1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>OpenTelemetryCollector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>trace</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>spec</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>mode</span><span class=p>:</span><span class=w> </span><span class=l>deployment</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>image</span><span class=p>:</span><span class=w> </span><span class=l>ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.140.1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>autoscaler</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>minReplicas</span><span class=p>:</span><span class=w> </span><span class=m>2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>maxReplicas</span><span class=p>:</span><span class=w> </span><span class=m>6</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>targetCPUUtilization</span><span class=p>:</span><span class=w> </span><span class=m>100</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>requests</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>cpu</span><span class=p>:</span><span class=w> </span><span class=l>100m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>memory</span><span class=p>:</span><span class=w> </span><span class=l>384Mi</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>limits</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>cpu</span><span class=p>:</span><span class=w> </span><span class=l>500m</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>memory</span><span class=p>:</span><span class=w> </span><span class=l>1Gi</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>ports</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>grpc</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>port</span><span class=p>:</span><span class=w> </span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>targetPort</span><span class=p>:</span><span class=w> </span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>observability</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>enableMetrics</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>env</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>POD_IP</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>valueFrom</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>fieldRef</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>fieldPath</span><span class=p>:</span><span class=w> </span><span class=l>status.podIP</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>K8S_NODE_NAME</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>valueFrom</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>fieldRef</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>fieldPath</span><span class=p>:</span><span class=w> </span><span class=l>spec.nodeName</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>config</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>extensions</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>health_check</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=l>${env:POD_IP}:13133</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=c># https://opentelemetry.io/docs/collector/components/receiver/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>receivers</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>otlp</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>protocols</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>grpc</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>endpoint</span><span class=p>:</span><span class=w> </span><span class=m>0.0.0.0</span><span class=p>:</span><span class=m>4317</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>prometheus</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>config</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>scrape_configs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>job_name</span><span class=p>:</span><span class=w> </span><span class=l>trace-collector</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>scrape_interval</span><span class=p>:</span><span class=w> </span><span class=l>30s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>static_configs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span>- <span class=nt>targets</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                    </span>- <span class=l>${env:POD_IP}:8888</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=c># https://opentelemetry.io/docs/collector/components/processor/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>memory_limiter</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>check_interval</span><span class=p>:</span><span class=w> </span><span class=l>1s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>limit_percentage</span><span class=p>:</span><span class=w> </span><span class=m>75</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>spike_limit_percentage</span><span class=p>:</span><span class=w> </span><span class=m>15</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>batch</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>send_batch_max_size</span><span class=p>:</span><span class=w> </span><span class=m>2048</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>send_batch_size</span><span class=p>:</span><span class=w> </span><span class=m>1024</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>timeout</span><span class=p>:</span><span class=w> </span><span class=l>1s</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>tail_sampling</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>policies</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>drop_spann</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>drop</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>drop</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>drop_sub_policy</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                  </span>- <span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>ottl_condition</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                    </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>sub-policy-0</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                    </span><span class=nt>ottl_condition</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                      </span><span class=nt>error_mode</span><span class=p>:</span><span class=w> </span><span class=l>ignore</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                      </span><span class=nt>span</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                        </span>- <span class=l>IsMatch(attributes[&#34;http.target&#34;], &#34;^(/health|/metrics|/ping|/ready)&#34;)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>keep_slow_requests</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>latency</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>latency</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>threshold_ms</span><span class=p>:</span><span class=w> </span><span class=m>1000</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>keep_error_requests</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>numeric_attribute</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>numeric_attribute</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>key</span><span class=p>:</span><span class=w> </span><span class=l>http.status_code</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>min_value</span><span class=p>:</span><span class=w> </span><span class=m>400</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>max_value</span><span class=p>:</span><span class=w> </span><span class=m>599</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>keep_user_spans</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>ottl_condition</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>ottl_condition</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>error_mode</span><span class=p>:</span><span class=w> </span><span class=l>ignore</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>span</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                  </span>- <span class=l>attributes[&#34;user.id&#34;] != nil and attributes[&#34;user.id&#34;] != &#34;&#34;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>keep_1_percent_of_the_rest</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>probabilistic</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span><span class=nt>probabilistic</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                </span><span class=nt>sampling_percentage</span><span class=p>:</span><span class=w> </span><span class=m>1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=c># https://opentelemetry.io/docs/collector/components/exporter/</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>exporters</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>debug</span><span class=p>:</span><span class=w> </span>{}<span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>otlphttp/victoriametrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>compression</span><span class=p>:</span><span class=w> </span><span class=l>gzip</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>encoding</span><span class=p>:</span><span class=w> </span><span class=l>proto</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>traces_endpoint</span><span class=p>:</span><span class=w> </span><span class=l>http://vmtraces-insert.victoriametrics:10481/insert/opentelemetry/v1/traces</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>tls</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>insecure</span><span class=p>:</span><span class=w> </span><span class=kc>true</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=c># https://opentelemetry.io/docs/collector/configuration/#service</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>service</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>telemetry</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>logs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>encoding</span><span class=p>:</span><span class=w> </span><span class=l>json</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>level</span><span class=p>:</span><span class=w> </span><span class=l>info</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>extensions</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>health_check</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=c># https://opentelemetry.io/docs/collector/configuration/#pipelines</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>pipelines</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>logs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>receivers</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>otlp]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>processors</span><span class=p>:</span><span class=w> </span><span class=p>[]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>exporters</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>debug]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>metrics</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>receivers</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>otlp]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>processors</span><span class=p>:</span><span class=w> </span><span class=p>[]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>exporters</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>debug]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>traces</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>receivers</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>otlp]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>processors</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span>- <span class=l>memory_limiter</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span>- <span class=l>tail_sampling</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>              </span>- <span class=l>batch</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>exporters</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=l>otlphttp/victoriametrics]</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><h2 id=trace-collector-rbac>trace-collector RBAC</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>rbac.authorization.k8s.io/v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ClusterRole</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-targetallocator</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>rules</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>pods</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>services</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>endpoints</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>nodes</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>nodes/metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>namespaces</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>configmaps</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;discovery.k8s.io&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>endpointslices</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;monitoring.coreos.com&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>probes</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>scrapeconfigs</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;monitoring.coreos.com&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>servicemonitors</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>podmonitors</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;*&#34;</span><span class=p>]</span><span class=w> </span><span class=c># targetAllocator throws a warning if this isnt permissive</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;opentelemetry.io&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>opentelemetrycollectors</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>apiGroups</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;networking.k8s.io&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>resources</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>ingresses</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;list&#34;</span><span class=p>,</span><span class=w> </span><span class=s2>&#34;watch&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>nonResourceURLs</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>/apis</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>/apis/*</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>/api</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>/api/*</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=l>/metrics</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>verbs</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&#34;get&#34;</span><span class=p>]</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nn>---</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>rbac.authorization.k8s.io/v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ClusterRoleBinding</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-targetallocator</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>roleRef</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>apiGroup</span><span class=p>:</span><span class=w> </span><span class=l>rbac.authorization.k8s.io</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ClusterRole</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-targetallocator</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>subjects</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>ServiceAccount</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>otel-targetallocator</span><span class=w> </span><span class=c># Controller provisions the SA but not the ClusterRole</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>namespace</span><span class=p>:</span><span class=w> </span><span class=l>open-telemetry</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div></div></div><div class=container><nav class="flex container suggested"><a rel=prev href=/post/kubernetes-management-tooling/ title="Previous post (older)"><span>Previous</span>
+Kubernetes management tooling</a></nav></div></main></main><footer class="footer flex"><section class=container><nav class=footer-links><a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a></nav></section><script async src=/js/features.min.fdb064613b89cfdaaa43fcf86c021408578dd158cf0accad7cc50e1913005d12.js></script></footer></body></html>
