@@ -1,6 +1,6 @@
 baseUrl: https://www.7onn.dev
 languageCode: en-us
-title: "📜🧙‍♂️ tom's blog"
+title: "🧙‍♂️ tom's blog"
 theme: hugo-tania
 enableEmoji: true
 privacy:
@@ -36,6 +36,10 @@ markup:
       unsafe: true
 params:
   #titleEmoji: '📜'
+  titleLogo: favicon.ico
+  siteName: "TMG's blog"
+  siteDesc: "Some notes from Tom"
+  author: "TMG"
   mainSections:
   - post
   socialOptions:
