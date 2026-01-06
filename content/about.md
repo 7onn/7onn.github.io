@@ -15,9 +15,18 @@ If you wish to send me something that only myself is able to read, encrypt some 
 
 ##### Professional experience
 
+##### [Kittl](https://www.kittl.com)
+Senior DevOps Engineer @Platform 2024 - current
+- Led migration from PaaS to Kubernetes, standardizing deployment workflows and enhancing scalability while contempting growing costs
+- Designed and operated Kubernetes-based preview environments and CI/CD for a monorepo, enabling per-PR environments and eliminating Render/Vercel (~€60k/year savings)
+- Engineered continuous delivery for monorepo production releases, improving release consistency and reducing manual effort
+- Built and operated a cost-efficient observability platform using Grafana and VictoriaMetrics, replacing Coralogix (~€25k/year savings)
+- Drove application instrumentation, SLO-based alerting, and operational runbooks, reducing alert fatigue and improving incident response quality
+- Modernized traffic management by migrating from NGINX Ingress to Gateway API with Cilium and Envoy
+
 ##### [Trade Republic](https://traderepublic.com)
 
-Software Engineer @DataPlatform 2023 - current
+Software Engineer @DataPlatform 2023 - 2024
 - Implemented DataHub to improve data discovery and governance
 - Supported the Fincrime team to deliver the anti-fraud ML platform with AWS SageMaker
 - Joined the Platform Engineering L2 Oncall
