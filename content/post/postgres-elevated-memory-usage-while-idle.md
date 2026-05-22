@@ -1,6 +1,6 @@
 ---
 title: "Postgres elevated memory in idleness"
-date: 2026-05-21T19:00:00Z
+date: 2026-05-21T19:00:00+02:00
 tags: [engineering, postgres, db, databases, sre, linux, memory]
 author: Tom M G
 draft: false
