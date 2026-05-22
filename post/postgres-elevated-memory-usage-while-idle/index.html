@@ -1,0 +1,167 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=theme-color content="dark"><title>Postgres elevated memory in idleness | 🧙‍♂️ tom's blog</title><link rel=stylesheet href=/sass/main.min.b81b77bfef641cdef5a77f4a7bb221547def6cea9b73ab29b5fed4c98707f2a8.css></head><body class=dark><nav class=navbar><div class=container><div class=flex><div><a class=brand href=/>🧙‍♂️ tom's blog</a></div><div class=flex><a href=/about/>About</a>
+<a href=/>Blog</a>
+<button id=dark-mode-button></button></div></div></div></nav><main><div class=container><article><header class=article-header><div class=thumb><div><h1>Postgres elevated memory in idleness</h1><div class=post-meta><div>By Tom M G on <time>May 21, 2026</time></div><div class=tags><a href=/tags/engineering/>engineering</a>
+<a href=/tags/postgres/>postgres</a>
+<a href=/tags/db/>db</a>
+<a href=/tags/databases/>databases</a>
+<a href=/tags/sre/>sre</a>
+<a href=/tags/linux/>linux</a>
+<a href=/tags/memory/>memory</a></div></div></div></div></header></article><div class=article-post><h1 id=context>Context</h1><p>Postgres container memory usage was elevated, while access and operations were effectively none. No active queries, no visible application traffic, no meaningful transaction rate, and no obvious maintenance task explaining the high consumption.</p><p>The first instinct is to look for a leak. But with databases is easy to confuse useful retained memory with harmful memory pressure. Postgres and the operating system both treat unused RAM as an opportunity to avoid future disk reads.</p><h1 id=troubleshooting>Troubleshooting</h1><p>Check the configured memory settings</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>select</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>name</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>setting</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>unit</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>source</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>from</span><span class=w> </span><span class=n>pg_settings</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>where</span><span class=w> </span><span class=n>name</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=p>(</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;shared_buffers&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;work_mem&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;hash_mem_multiplier&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;maintenance_work_mem&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;autovacuum_work_mem&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;temp_buffers&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;max_connections&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=s1>&#39;effective_cache_size&#39;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>order</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=n>name</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>Check what <code>pg_stat_activity</code> shows as long running operations</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>select</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>state</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>wait_event_type</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>wait_event</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>count</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>sessions</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>from</span><span class=w> </span><span class=n>pg_stat_activity</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>where</span><span class=w> </span><span class=n>pid</span><span class=w> </span><span class=o>&lt;&gt;</span><span class=w> </span><span class=n>pg_backend_pid</span><span class=p>()</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>group</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=k>state</span><span class=p>,</span><span class=w> </span><span class=n>wait_event_type</span><span class=p>,</span><span class=w> </span><span class=n>wait_event</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>order</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=n>sessions</span><span class=w> </span><span class=k>desc</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>Then list the sessions that could plausibly allocate memory</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>select</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>pid</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>backend_type</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>usename</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>application_name</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>client_addr</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>state</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>now</span><span class=p>()</span><span class=w> </span><span class=o>-</span><span class=w> </span><span class=n>query_start</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>query_age</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>wait_event_type</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>wait_event</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>left</span><span class=p>(</span><span class=n>query</span><span class=p>,</span><span class=w> </span><span class=mi>160</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>query</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>from</span><span class=w> </span><span class=n>pg_stat_activity</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>where</span><span class=w> </span><span class=k>state</span><span class=w> </span><span class=k>is</span><span class=w> </span><span class=k>distinct</span><span class=w> </span><span class=k>from</span><span class=w> </span><span class=s1>&#39;idle&#39;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>order</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=n>query_age</span><span class=w> </span><span class=k>desc</span><span class=w> </span><span class=n>nulls</span><span class=w> </span><span class=k>last</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>Check memory contexts</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>select</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>name</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>ident</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>parent</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>pg_size_pretty</span><span class=p>(</span><span class=n>total_bytes</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>total</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>pg_size_pretty</span><span class=p>(</span><span class=n>used_bytes</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>used</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>pg_size_pretty</span><span class=p>(</span><span class=n>free_bytes</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=k>free</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>from</span><span class=w> </span><span class=n>pg_backend_memory_contexts</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>order</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=n>total_bytes</span><span class=w> </span><span class=k>desc</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>limit</span><span class=w> </span><span class=mi>30</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>Check whether queries are spilling because memory is too small</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>select</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>datname</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>temp_files</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>pg_size_pretty</span><span class=p>(</span><span class=n>temp_bytes</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>temp_written</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>from</span><span class=w> </span><span class=n>pg_stat_database</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>order</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=n>temp_bytes</span><span class=w> </span><span class=k>desc</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>To see what is occupying <code>shared_buffers</code>, <code>pg_buffercache</code> is helpful:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>create</span><span class=w> </span><span class=n>extension</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=k>not</span><span class=w> </span><span class=k>exists</span><span class=w> </span><span class=n>pg_buffercache</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>select</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>coalesce</span><span class=p>(</span><span class=n>n</span><span class=p>.</span><span class=n>nspname</span><span class=p>,</span><span class=w> </span><span class=s1>&#39;&lt;unknown&gt;&#39;</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=k>schema</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>coalesce</span><span class=p>(</span><span class=k>c</span><span class=p>.</span><span class=n>relname</span><span class=p>,</span><span class=w> </span><span class=s1>&#39;&lt;unknown&gt;&#39;</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>relation</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>count</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>buffers</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>pg_size_pretty</span><span class=p>(</span><span class=k>count</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=n>current_setting</span><span class=p>(</span><span class=s1>&#39;block_size&#39;</span><span class=p>)::</span><span class=nb>bigint</span><span class=p>)</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>buffered</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>from</span><span class=w> </span><span class=n>pg_buffercache</span><span class=w> </span><span class=n>b</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>left</span><span class=w> </span><span class=k>join</span><span class=w> </span><span class=n>pg_class</span><span class=w> </span><span class=k>c</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>on</span><span class=w> </span><span class=n>pg_relation_filenode</span><span class=p>(</span><span class=k>c</span><span class=p>.</span><span class=n>oid</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>b</span><span class=p>.</span><span class=n>relfilenode</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>left</span><span class=w> </span><span class=k>join</span><span class=w> </span><span class=n>pg_namespace</span><span class=w> </span><span class=n>n</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>on</span><span class=w> </span><span class=n>n</span><span class=p>.</span><span class=n>oid</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>c</span><span class=p>.</span><span class=n>relnamespace</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>where</span><span class=w> </span><span class=n>b</span><span class=p>.</span><span class=n>reldatabase</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=p>(</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=mi>0</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=p>(</span><span class=k>select</span><span class=w> </span><span class=n>oid</span><span class=w> </span><span class=k>from</span><span class=w> </span><span class=n>pg_database</span><span class=w> </span><span class=k>where</span><span class=w> </span><span class=n>datname</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>current_database</span><span class=p>())</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=p>)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>group</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=n>n</span><span class=p>.</span><span class=n>nspname</span><span class=p>,</span><span class=w> </span><span class=k>c</span><span class=p>.</span><span class=n>relname</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>order</span><span class=w> </span><span class=k>by</span><span class=w> </span><span class=k>count</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=w> </span><span class=k>desc</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=k>limit</span><span class=w> </span><span class=mi>30</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>In container metrics, check what corresponds to a larger share of the total usage</p><pre tabindex=0><code>100
+* sum(container_memory_cache{namespace=&#34;&lt;ns&gt;&#34;, pod=~&#34;&lt;name&gt;.*&#34;}) by (pod, container) 
+/ sum(container_memory_usage_bytes{namespace=&#34;&lt;ns&gt;&#34;, pod=~&#34;&lt;name&gt;.*&#34;}) by (pod, container)
+</code></pre><pre tabindex=0><code>100
+* sum(container_memory_rss_bytes{namespace=&#34;&lt;ns&gt;&#34;, pod=~&#34;&lt;name&gt;.*&#34;}) by (pod, container) 
+/ sum(container_memory_usage_bytes{namespace=&#34;&lt;ns&gt;&#34;, pod=~&#34;&lt;name&gt;.*&#34;}) by (pod, container)
+</code></pre><h1 id=how-postgres-uses-memory>How Postgres uses memory</h1><p>Postgres has a few different memory categories, and they do not all behave like short-lived application heap.</p><p><code>shared_buffers</code> is the most visible one. It is a shared cache managed by Postgres for table and index pages. Once pages are read and this cache is warmed, the memory is expected to stay useful. A quiet database does not mean Postgres should eagerly empty this cache.</p><p>Backend processes also keep memory for connection-local state. Settings such as <code>work_mem</code> and <code>maintenance_work_mem</code> describe how much memory certain operations may use, but they are not all fully reserved at startup. They become relevant when a sort, hash, vacuum, index build, or similar operation actually needs them.</p><p>There are also background processes: checkpointer, WAL writer, autovacuum, stats, and friends. Even when application traffic is absent, Postgres is not a single sleeping process.</p><h1 id=practical-takeaway>Practical takeaway</h1><p>For Postgres, high memory during idle time is not automatically a problem. It becomes a problem when it comes with low <code>MemAvailable</code> (<code>sum(container_memory_available_bytes{namespace="&lt;ns>", pod=~"&lt;name>.*"}) by (pod, container)</code>), cgroup pressure, swap activity, OOM events, continuously growing private RSS, or query behavior that allocates memory without returning to a stable baseline.</p></div></div><div class=container><nav class="flex container suggested"><a rel=prev href=/post/kubernetes-otel-collector/ title="Previous post (older)"><span>Previous</span>
+Kubernetes metrics, logs, and traces via OpenTelemetry collector</a></nav></div></main></main><footer class="footer flex"><section class=container><nav class=footer-links><a href=/tom.asc>PGP</a>
+<a href=/index.xml>RSS</a></nav></section><script async src=/js/features.min.fdb064613b89cfdaaa43fcf86c021408578dd158cf0accad7cc50e1913005d12.js></script></footer></body></html>
